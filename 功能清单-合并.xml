@@ -1,0 +1,53 @@
+# 项目全周期管理平台功能清单
+
+<table>
+<colgroup><col/><col/><col/><col/><col/></colgroup>
+<thead><tr><th><p>功能模块</p></th><th><p>一级功能项</p></th><th><p>二级功能项</p></th><th><p>功能点说明</p></th><th><p>RD Check</p></th></tr></thead>
+<tbody>
+<tr><td vertical-align="top" rowspan="2"><p>工作台</p></td><td vertical-align="top" rowspan="2"><p>项目概览</p></td><td vertical-align="top"><p>数据统计</p></td><td vertical-align="top"><ul><li>展示谋划/在谈/签约/落地/退库各阶段项目数量统计卡片</li><li>待办事项快捷入口</li><li>最近操作项目列表</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>消息通知</p></td><td vertical-align="top"><ul><li>Header消息中心入口</li><li>未读消息数角标实时显示</li><li>消息支持点击跳转对应项目详情</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top" rowspan="32"><p>项目全生命周期管理</p></td><td vertical-align="top" rowspan="7"><p>项目谋划</p></td><td vertical-align="top"><p>列表查询</p></td><td vertical-align="top"><ul><li>筛选：项目名称/产业类别/行业类别/内外资/申报时间</li><li>统计条：项目总数、当页及筛选投资总额</li><li>支持搜索/重置/导出/表头列管理</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>新增项目</p></td><td vertical-align="top"><ul><li>弹窗表单录入核心字段，支持仅记录初步想法</li><li>必填项含项目分类（政策类/投资类/供地类/其他）</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>详情查看</p></td><td vertical-align="top"><ul><li>查看项目完整信息</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>进展汇报</p></td><td vertical-align="top"><ul><li>填写进展内容，不超过500字</li><li>超时未更新自动系统预警</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>转在谈</p></td><td vertical-align="top"><ul><li>二次确认后补充在谈阶段必填字段</li><li>自动带入谋划已填信息</li><li>转入跟踪洽谈阶段，从谋划列表流出</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>退库</p></td><td vertical-align="top"><ul><li>二次确认（不可恢复）</li><li>归入退库列表</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>导出</p></td><td vertical-align="top"><ul><li>筛选结果自定义导出Excel</li><li>不支持导入</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top" rowspan="9"><p>跟踪洽谈</p></td><td vertical-align="top"><p>列表查询</p></td><td vertical-align="top"><ul><li>筛选：项目名称/产业类别/行业类别/投资金额区间/申报时间</li><li>展开区：楚商类型/内外资/企业性质</li><li>统计条：项目总数、当页及筛选投资总额</li><li>支持搜索/重置/导出/表头列管理</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>双视角机制</p></td><td vertical-align="top"><ul><li>发起人视角：查看所有项目，具备完整操作权限</li><li>接收方视角：仅展示分派给本单位的项目，仅可查看和反馈，无操作按钮</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>新增/导入</p></td><td vertical-align="top"><ul><li>谋划项目转在谈（自动带入信息）</li><li>直接新增</li><li>Excel批量导入园区自维护在谈项目表</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>编辑</p></td><td vertical-align="top"><ul><li>更新在谈阶段基础信息</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>决策节点更新</p></td><td vertical-align="top"><ul><li>按项目分类匹配节点：政策类（投委会、常务会）、投资类超5000万（国企投决会、投委会、常务会）、供地类（投委会、常务会、供地会）</li><li>手动标记节点通过日期，支持撤销上一节点</li><li>列表及详情展示项目分类与节点完成状态</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>分派</p></td><td vertical-align="top"><ul><li>多选接收单位（可搜索）</li><li>协同事项说明不超过500字</li><li>附件单个不超过20MB、最多9个</li><li>分派后各单位独立跟踪进度并推送消息通知</li><li>接收方可提交反馈，支持标记完成</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>转签约</p></td><td vertical-align="top"><ul><li>二次确认后补充签约阶段必填字段（含签约协议）</li><li>转入签约注册阶段，从在谈列表流出</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>退库</p></td><td vertical-align="top"><ul><li>二次确认（不可恢复）</li><li>归入退库列表</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>项目详情</p></td><td vertical-align="top"><ul><li>基础信息：项目信息/分类指标/投资信息/投资主体/决策节点流程图</li><li>进展信息：手动进展、决策节点变更、阶段流转时间线</li><li>分派情况：分派统计（总数/处理中/已完成）、分派流向、反馈记录（各单位仅可见自己提交的内容）</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top" rowspan="6"><p>签约注册</p></td><td vertical-align="top"><p>列表查询</p></td><td vertical-align="top"><ul><li>筛选：项目名称/产业类别/行业类别/投资金额区间/签约时间/招商类型/协议类型/项目状态</li><li>统计条：项目总数、当页及筛选投资总额</li><li>已落地项目保留在列表并标记"已落地"</li><li>支持按签约时间范围查询</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>导入判重</p></td><td vertical-align="top"><ul><li>从市级平台导入签约数据，避免两级平台重复填报</li><li>导入时按项目名称/编码判重，重复时提示处理</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>编辑</p></td><td vertical-align="top"><ul><li>更新签约阶段基础信息</li><li>支持针对已签约未落地项目更新进展</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>推进落地</p></td><td vertical-align="top"><ul><li>手动触发转入落地阶段</li><li>转入时需补充落地阶段相关信息方可完成</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>退库</p></td><td vertical-align="top"><ul><li>二次确认（不可恢复）</li><li>归入退库列表</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>项目详情</p></td><td vertical-align="top"><ul><li>基础信息：签约状态/项目基本信息/分类指标/投资信息/投资主体及负责单位</li><li>进展信息：含前序阶段进展</li><li>分派情况：同跟踪洽谈</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top" rowspan="5"><p>项目落地</p></td><td vertical-align="top"><p>列表查询</p></td><td vertical-align="top"><ul><li>筛选：项目名称/产业类别/行业类别/开工状态/开工开业类型（建安类/设备购置类/开业）/落地时间</li><li>关键信息展示：是否已开工、开工/开业时间、落地时间</li><li>已签约未落地、已落地项目均展示</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>到资情况</p></td><td vertical-align="top"><ul><li>到资汇总：到资金额/当年到位资金/现阶段到资</li><li>分笔到资记录：到资时间/金额/累计到资/备注</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>编辑</p></td><td vertical-align="top"><ul><li>仅落地阶段字段可编辑（落地时间/开工开业信息/发改口径/经信口径/基金投资/到资信息）</li><li>前期阶段字段只读回显</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>导出</p></td><td vertical-align="top"><ul><li>支持数据导出</li><li>不支持导入</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>项目详情</p></td><td vertical-align="top"><ul><li>基础信息：落地信息（置顶）/签约状态/基本信息/分类指标/投资信息/投资主体</li><li>进展信息：只读历史记录，不再新增</li><li>分派情况：只读历史记录，不再发起分派</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top" rowspan="3"><p>重复研判</p></td><td vertical-align="top"><p>研判列表</p></td><td vertical-align="top"><ul><li>AI检测重复项目</li><li>冲突等级：L1强匹配（编码相同或名称+投资主体完全相同）/L2高相似（名称相似度85%以上+投资主体相同）/L3中风险（名称相似度60%~85%）/L4弱提示</li><li>展示AI建议与置信度、冲突原因</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>研判处理</p></td><td vertical-align="top"><ul><li>处理操作：合并覆盖/已忽略/视为新项目</li><li>处理结果留痕</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>列表筛选</p></td><td vertical-align="top"><ul><li>按处理状态/冲突等级/项目阶段筛选</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top" rowspan="2"><p>项目退库</p></td><td vertical-align="top"><p>退库列表</p></td><td vertical-align="top"><ul><li>展示各阶段退库项目</li><li>标识退库来源阶段/退库原因/退库时间/操作人</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>详情查看</p></td><td vertical-align="top"><ul><li>只读查看退库项目完整信息</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top" rowspan="4"><p>统计看板</p></td><td vertical-align="top" rowspan="2"><p>项目维度看板</p></td><td vertical-align="top"><p>核心指标</p></td><td vertical-align="top"><ul><li>在谈/签约/落地/退库项目数统计卡片</li><li>数据实时汇总</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>图表分析</p></td><td vertical-align="top"><ul><li>项目阶段分布饼图</li><li>各产业类别项目数量柱状图</li><li>月度申报趋势折线图</li><li>投资金额TOP10项目横向柱状图</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top" rowspan="2"><p>绩效维度看板</p></td><td vertical-align="top"><p>绩效指标</p></td><td vertical-align="top"><ul><li>已完成/进行中/超期指标数统计卡片</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>图表分析</p></td><td vertical-align="top"><ul><li>各部门招商绩效雷达图（6维度）</li><li>各区完成率对比柱状图</li><li>各区绩效明细排名表</li><li>超期指标红色预警</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top" rowspan="7"><p>系统管理</p></td><td vertical-align="top"><p>账号管理</p></td><td vertical-align="top"><p>用户管理</p></td><td vertical-align="top"><ul><li>按用户名/姓名搜索</li><li>角色筛选（系统管理员/区级领导/区投促局/园区管理员/项目专员）</li><li>账号启用/禁用</li><li>角色绑定（对接OA组织架构）</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>角色管理</p></td><td vertical-align="top"><p>角色配置</p></td><td vertical-align="top"><ul><li>系统角色定义</li><li>权限分配（菜单/操作/数据权限）</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>日志管理</p></td><td vertical-align="top"><p>操作日志</p></td><td vertical-align="top"><ul><li>操作日志记录查看</li><li>按操作人/操作类型/时间筛选</li><li>审计追踪</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>字段管理</p></td><td vertical-align="top"><p>字段配置</p></td><td vertical-align="top"><ul><li>按阶段管理表单字段（谋划/在谈/研判/签约/落地）</li><li>字段属性：字段名/字段类型（文本/多行文本/下拉/数字/日期/金额/单选）/是否必填/启用状态</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>超期设置</p></td><td vertical-align="top"><p>预警规则</p></td><td vertical-align="top"><ul><li>各阶段超期天数阈值设置（谋划45天/在谈30天/签约20天，可调整）</li><li>进展汇报到期前提醒天数设置（默认7天）</li><li>超阈值未更新自动发送预警通知</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>消息通知</p></td><td vertical-align="top"><p>通知管理</p></td><td vertical-align="top"><ul><li>系统消息列表（分派通知/反馈提醒/预警通知）</li><li>未读/已读状态管理</li><li>一键全部已读</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+<tr><td vertical-align="top"><p>个人中心</p></td><td vertical-align="top"><p>个人信息</p></td><td vertical-align="top"><ul><li>个人信息维护</li><li>密码修改</li><li>偏好设置</li></ul></td><td vertical-align="top"><p>✅</p></td></tr>
+</tbody>
+</table>

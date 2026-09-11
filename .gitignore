@@ -27,3 +27,6 @@ deploy.sh
 
 # Version backup snapshots
 /demo备份_*.zip
+
+# 业务方提供的原始资料（含二进制，不上传）
+/投促局提供资料/

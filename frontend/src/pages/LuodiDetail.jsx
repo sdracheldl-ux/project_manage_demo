@@ -12,6 +12,7 @@ import ProgressTimeline from '../components/ProgressTimeline'
 import ProgressSummaryModal from '../components/ProgressSummaryModal'
 import { useViewRole } from '../store/viewStore'
 import { findUnitByKey } from '../constants/assignConfig'
+import { RESPONSIBLE_UNIT_OPTIONS, normalizeResponsibleUnits, CITY_CODE_SEEDS } from '../constants/projectEnums'
 import {
   COLORS,
   sectionTitleStyle,
@@ -38,15 +39,19 @@ function formatDate(d) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
 
-// 项目状态标签（签约状态分组内展示）
-const projectStatusTag = (status) => {
-  const colorMap = {
-    '新签约': 'blue',
-    '已注册': 'cyan',
-    '已开工开业': 'processing',
-  }
-  const color = colorMap[status] || 'default'
-  return <Tag color={color} style={{ margin: 0 }}>{status}</Tag>
+// 责任单位 Tag 渲染（最多3个，超出+N；空值回退 '-'）
+const renderUnits = (v) => {
+  const list = normalizeResponsibleUnits(v)
+  if (list.length === 0) return emptyTag('')
+  const unitTagStyle = { background: '#e6f4ff', color: '#1677ff', border: '1px solid #91caff', margin: 0 }
+  const shown = list.slice(0, 3)
+  const rest = list.length - shown.length
+  return (
+    <Space size={4} wrap>
+      {shown.map(u => <Tag key={u} style={unitTagStyle}>{u}</Tag>)}
+      {rest > 0 && <Tag style={unitTagStyle}>+{rest}</Tag>}
+    </Space>
+  )
 }
 
 export default function LuodiDetail() {
@@ -54,90 +59,66 @@ export default function LuodiDetail() {
   const navigate = useNavigate()
   const { role, isSponsor, myDeptKey } = useViewRole()
 
-  // 构造mock项目数据（从luodi mock数据读取；前期阶段字段只读回显）
+  // 构造mock项目数据（从luodi mock数据读取；详情=签约阶段全部字段+落地2字段，新口径）
   const [project, setProject] = useState(() => {
-    const item = mockData.luodi.find(i => String(i.id) === String(id)) || mockData.luodi[0]
-    const productionDate = item['投产时间(经信)']
-    const productionOk = productionDate && productionDate !== '-'
+    const rawIndex = mockData.luodi.findIndex(i => String(i.id) === String(id))
+    const item = rawIndex >= 0 ? mockData.luodi[rawIndex] : mockData.luodi[0]
+    const rowIdx = rawIndex >= 0 ? rawIndex : 0
     const registerCapitalYi = Number(item['注册资本(亿元)'] || 0)
-    const registerCapitalWan = Number(item['注册资本(万元)'] || 0)
+    const units = normalizeResponsibleUnits(item['责任单位'] || item.responsibleUnits)
+    const responsibleUnits = units.length ? units : [RESPONSIBLE_UNIT_OPTIONS[rowIdx % RESPONSIBLE_UNIT_OPTIONS.length]]
     return {
       key: String(item.id || id),
       _raw: item,
+      responsibleUnits,
       projectCode: item['编号'] || '-',
-      cityProjectCode: item['市级项目编码'] || '-',
+      cityProjectCode: item['市级项目编码'] || CITY_CODE_SEEDS[rowIdx % CITY_CODE_SEEDS.length],
       projectName: item['项目名称'] || '-',
-      projectStatus: item['项目状态'] || '已开工开业',
       reporter: item['申报人'] || '-',
-      reportTime: item['申报时间'] || '-',
-      projectArea: item['项目区域'] || '-',
-      addressDetail: item['项目建设地址'] || '-',
-      investAmount: item['投资金额(亿元)'] || 0,
-      fixedInvestAmount: item['固投金额(亿元)'] || 0,
-      recordAmount: item['备案证金额(亿元)'] || 0,
-      arrivalAmount: item['到资金额(亿元)'] || 0,
+      reportTime: item['申报时间'] || '2026-06-25',
+      // 项目基础信息
+      capitalNature: item['内外资'] || '内资',
+      sourceArea: item['来源地'] || '-',
       industryCategory: item['产业类别'] || '-',
-      industryType: item['行业类别（门类）'] || '-',
-      domesticForeign: item['内外资'] || '内资',
-      enterpriseNature: item['企业性质'] || '-',
+      industryType: item['行业类别'] || item['行业类别（门类）'] || '-',
+      secondaryIndustryCategory: item['次要行业类别'] || '-',
+      projectDesc: item['项目简介'] || '-',
+      // 在谈阶段信息
+      projectCategory: item['项目分类'] && item['项目分类'] !== '-' ? item['项目分类'] : ['投资类', '政策类', '供地类', '其他'][rowIdx % 4],
+      investAmount: item['计划投资总额(亿元)'] || item['投资金额(亿元)'] || 0,
+      needInvestAmount: item['需投资金额(亿元)'] || '-',
+      investorEntity: item['投资主体'] || '-',
+      dockingDate: item['对接时间'] || '-',
       enterpriseCategory: item['企业类别'] || '-',
-      isSigned: item['是否已签约'] || '是',
-      signDate: item['协议签订时间'] || '-',
-      agreementType: item['协议类型'] || '-',
-      isRegistered: item['是否已注册'] || '否',
-      registerDate: formatDate(item['注册时间']),
+      isStock: item['是否为存量企业'] || '否',
+      registeredCapitalAmount: item['注册资本(亿元)'] || '-',
+      isEnclave: item['是否飞地园区'] || '否',
+      isOverflow: item['是否产业外溢'] || '否',
+      chuShangType: item['楚商类型'] || '-',
+      // 签约阶段信息
+      constructionNature: item['建设性质'] || item['建设类型'] || '-',
+      constructionNatureLevel2: item['建设分类'] || '-',
+      merchantType: item['招商类型'] || '-',
+      merchantTypeDesc: item['招商类型说明'] || '-',
+      isZheshang: item['是否浙商'] || '否',
+      landSituation: item['用地情况'] || '-',
+      isHqEconomy: item['是否总部经济'] || '否',
+      hqEconomyLevel1: item['总部经济类型一级'] || '-',
+      hqEconomyLevel2: item['总部经济类型二级'] || '-',
+      recordAmount: item['备案证金额(亿元)'] || [0.6, 1.2, 0.35, 2.1][rowIdx % 4],
+      fixedInvestAmount: item['固投金额(亿元)'] || 0,
+      signDate: item['协议签订时间'] || ['2026-03-15', '2026-04-02', '2026-05-20', '2026-06-11'][rowIdx % 4],
+      agreementType: item['协议类型'] || ['投资协议', '框架协议', '投资协议', '补充协议'][rowIdx % 4],
+      isRegister: item['是否注册'] || item['是否已注册'] || '否',
+      registerDate: item['注册时间'] ? formatDate(item['注册时间']) : '-',
+      registerCapitalAmount: item['注册资本'] || (registerCapitalYi > 0 ? String(registerCapitalYi) : '-'),
+      registerCapitalUnit: item['注册资本单位'] || (registerCapitalYi > 0 ? '亿元' : '万元'),
       registerCompanyName: item['注册公司名称'] || item['注册公司'] || '-',
-      registerCapital: registerCapitalYi > 0 ? `${registerCapitalYi} 亿元` : registerCapitalWan > 0 ? `${registerCapitalWan} 万元` : '-',
-      creditCode: item['签约主体证照号码'] || '-',
-      investorEntityLicense: item['投资主体证照号码'] || '-',
-      isStartWork: item['是否已开工'] || '否',
+      signSubject: item['签约主体(洽谈主体)'] || item['投资主体'] || '-',
+      // 落地阶段信息（转落地填写）
       startWorkType: item['开工开业类型'] || '-',
       startWorkDate: formatDate(item['开工/业时间']),
-      isProduction: productionOk ? '是' : '否',
-      productionDate: productionOk ? productionDate : '-',
-      landingDate: item['落地时间'] || '-',
-      fgStartWorkDate: item['实际开工时间(发改)'] || '-',
-      fgFinishDate: item['实际竣工时间(发改)'] || '-',
-      fgRuTong: item['是否入统(发改)'] || '否',
-      jxStartWorkDate: item['实际开工时间(经信)'] || '-',
-      jxRuTongDate: item['入统时间(经信)'] || '-',
-      jxJinGuiDate: item['进规时间(经信)'] || '-',
-      jxJiGai: item['是否技改(经信)'] || '否',
-      fundName: item['基金名称'] || '-',
-      fundAmount: item['基金参投金额(万元)'],
-      investorEntity: item['投资主体'] || '-',
-      signSubject: item['签约主体(洽谈主体)'] || item['投资主体'] || '-',
-      investorContact: item['投资方联系人'] || '-',
-      investorPhone: item['投资方联系方式'] || '-',
-      responsibleUnit: item['负责单位'] || '-',
-      districtLeader: item['区级责任领导'] || '-',
-      projectDesc: item['项目简介'] || '-',
-      sourceArea: item['来源地'] || '-',
-      yearArrivalAmount: item['当年到位资金情况(亿元)'] || 0,
-      currentStageArrival: item['现阶段到资情况(亿元)'] || 0,
-      expectAnnualOutput: item['预计年产值(亿元)'] || 0,
-      expectAnnualTax: item['预计年税收(亿元)'] || 0,
-      investForm: item['投资形态'] || '-',
-      wugu: item['所属”五谷”优势产业集群'] || '-',
-      pianqu: item['所属片区'] || '-',
-      landSituation: item['用地情况'] || '-',
-      landArea: item['用地/办公面积'] || 0,
-      isFdi: item['是否FDI'] || '否',
-      fdiAmount: item['FDI金额(万美元)'] || 0,
-      isRnd: item['是否研发中心'] || '否',
-      isHqEconomy: item['是否总部经济'] || '否',
-      hqEconomyLevel1: item['总部经济类型'] || '-',
-      hqEconomyLevel2: item['总部建设类型'] || '-',
-      chuShangType: item['楚商类型'] || '-',
-      isZheshang: item['是否浙商'] || '否',
-      keyIndustry: item['重点产业'] || '-',
-      constructionNature: item['建设性质'] || '-',
-      constructionNatureLevel2: item['建设类型'] || '-',
-      planningType: item['策划类型'] || '-',
-      projectAttr: item['立项属性'] || '-',
-      merchantType: item['招商类型'] || '-',
-      chain965: item['对应“965”产业链类别'] || '-',
-      arrivalUsage: item['到位资金用途说明'] || '-',
+      projectStatus: item['项目状态'] || '已开工开业',
     }
   })
 
@@ -256,29 +237,13 @@ export default function LuodiDetail() {
   const handleBack = () => navigate('/project/luodi')
 
   const handleEditOk = (values) => {
-    setFormValues(values)
+    const fmt = (v) => (v && typeof v === 'object' && v.format ? v.format('YYYY-MM-DD') : v)
+    // 持久化本次编辑值（日期格式化存储，避免 dayjs 对象）
+    setFormValues({ startWorkType: values.startWorkType, startDate: fmt(values.startDate) })
     setProject(prev => ({
       ...prev,
-      landingDate: values.landingDate ? formatDate(values.landingDate) : prev.landingDate,
-      isStartWork: values.isStarted || prev.isStartWork,
-      startWorkType: values.startWorkType || '-',
-      startWorkDate: values.startDate ? formatDate(values.startDate) : prev.startWorkDate,
-      constructionNatureLevel2: values.constructionType || prev.constructionNatureLevel2,
-      fgStartWorkDate: values.fgStartWorkDate ? formatDate(values.fgStartWorkDate) : '-',
-      fgFinishDate: values.fgFinishDate ? formatDate(values.fgFinishDate) : '-',
-      fgRuTong: values.fgRuTong || prev.fgRuTong,
-      jxStartWorkDate: values.jxStartWorkDate ? formatDate(values.jxStartWorkDate) : '-',
-      jxRuTongDate: values.jxRuTongDate ? formatDate(values.jxRuTongDate) : '-',
-      jxJinGuiDate: values.jxJinGuiDate ? formatDate(values.jxJinGuiDate) : '-',
-      isProduction: values.jxTouChanDate ? '是' : prev.isProduction,
-      productionDate: values.jxTouChanDate ? formatDate(values.jxTouChanDate) : prev.productionDate,
-      jxJiGai: values.jxJiGai || prev.jxJiGai,
-      fundName: values.fundName || '-',
-      fundAmount: values.fundAmount ?? prev.fundAmount,
-      arrivalAmount: values.arrivalAmount ?? prev.arrivalAmount,
-      yearArrivalAmount: values.yearArrivalAmount ?? prev.yearArrivalAmount,
-      currentStageArrival: values.currentStageArrival ?? prev.currentStageArrival,
-      arrivalUsage: values.arrivalUseDesc || prev.arrivalUsage,
+      startWorkType: values.startWorkType || prev.startWorkType,
+      startWorkDate: values.startDate ? fmt(values.startDate) : prev.startWorkDate,
     }))
     message.success('落地信息已更新')
     setEditModalVisible(false)
@@ -331,47 +296,44 @@ export default function LuodiDetail() {
             label: '基础信息',
             children: (
               <div>
-                {/* 落地信息（落地阶段补充字段，置顶展示） */}
-                <div style={sectionTitleStyle}>落地信息</div>
+                {/* 项目基础信息 */}
+                <div style={sectionTitleStyle}>项目基础信息</div>
                 <Descriptions {...baseDescriptionsProps} style={{ marginBottom: 24 }}>
-                  <Descriptions.Item label="落地时间">{emptyTag(project.landingDate)}</Descriptions.Item>
-                  <Descriptions.Item label="实际开工时间(发改)">{emptyTag(project.fgStartWorkDate)}</Descriptions.Item>
-                  <Descriptions.Item label="实际竣工时间(发改)">{emptyTag(project.fgFinishDate)}</Descriptions.Item>
-                  <Descriptions.Item label="是否入统(发改)">{boolTag(project.fgRuTong)}</Descriptions.Item>
-                  <Descriptions.Item label="实际开工时间(经信)">{emptyTag(project.jxStartWorkDate)}</Descriptions.Item>
-                  <Descriptions.Item label="入统时间(经信)">{emptyTag(project.jxRuTongDate)}</Descriptions.Item>
-                  <Descriptions.Item label="进规时间(经信)">{emptyTag(project.jxJinGuiDate)}</Descriptions.Item>
-                  <Descriptions.Item label="是否技改(经信)">{boolTag(project.jxJiGai)}</Descriptions.Item>
-                  <Descriptions.Item label="基金名称" span={2}>{emptyTag(project.fundName)}</Descriptions.Item>
-                  <Descriptions.Item label="基金参投金额(万元)">{emptyTag(project.fundAmount)}</Descriptions.Item>
-                </Descriptions>
-
-                {/* 签约状态（前期阶段信息，只读回显） */}
-                <div style={sectionTitleStyle}>签约状态</div>
-                <Descriptions {...baseDescriptionsProps} style={{ marginBottom: 24 }}>
-                  <Descriptions.Item label="是否签约">{boolTag(project.isSigned)}</Descriptions.Item>
-                  <Descriptions.Item label="协议签订时间">{emptyTag(project.signDate)}</Descriptions.Item>
-                  <Descriptions.Item label="协议类型">{emptyTag(project.agreementType)}</Descriptions.Item>
-                  <Descriptions.Item label="项目状态">{projectStatusTag(project.projectStatus)}</Descriptions.Item>
-                  <Descriptions.Item label="是否注册">{boolTag(project.isRegistered)}</Descriptions.Item>
-                  <Descriptions.Item label="注册时间">{emptyTag(project.registerDate)}</Descriptions.Item>
-                  <Descriptions.Item label="是否开工">{boolTag(project.isStartWork)}</Descriptions.Item>
-                  <Descriptions.Item label="开工开业类型">{emptyTag(project.startWorkType)}</Descriptions.Item>
-                  <Descriptions.Item label="开工/开业时间">{emptyTag(project.startWorkDate)}</Descriptions.Item>
-                  <Descriptions.Item label="是否投产">{boolTag(project.isProduction)}</Descriptions.Item>
-                  <Descriptions.Item label="投产时间">{emptyTag(project.productionDate)}</Descriptions.Item>
-                </Descriptions>
-
-                {/* 项目基本信息 */}
-                <div style={sectionTitleStyle}>项目基本信息</div>
-                <Descriptions {...baseDescriptionsProps} style={{ marginBottom: 24 }}>
-                  <Descriptions.Item label="市级项目编码">{emptyTag(project.cityProjectCode)}</Descriptions.Item>
-                  <Descriptions.Item label="区级项目编码">{emptyTag(project.projectCode)}</Descriptions.Item>
                   <Descriptions.Item label="项目名称" span={2}>{emptyTag(project.projectName)}</Descriptions.Item>
+                  <Descriptions.Item label="责任单位" span={2}>{renderUnits(project.responsibleUnits)}</Descriptions.Item>
+                  <Descriptions.Item label="区级项目编码">{emptyTag(project.projectCode)}</Descriptions.Item>
+                  <Descriptions.Item label="市级项目编码">{emptyTag(project.cityProjectCode)}</Descriptions.Item>
+                  <Descriptions.Item label="内外资">{emptyTag(project.capitalNature)}</Descriptions.Item>
+                  <Descriptions.Item label="来源地">{emptyTag(project.sourceArea)}</Descriptions.Item>
+                  <Descriptions.Item label="产业类别">{emptyTag(project.industryCategory)}</Descriptions.Item>
+                  <Descriptions.Item label="行业类别">{emptyTag(project.industryType)}</Descriptions.Item>
+                  <Descriptions.Item label="次要行业类别">{emptyTag(project.secondaryIndustryCategory)}</Descriptions.Item>
                   <Descriptions.Item label="申报人">{emptyTag(project.reporter)}</Descriptions.Item>
                   <Descriptions.Item label="申报时间">{emptyTag(project.reportTime)}</Descriptions.Item>
-                  <Descriptions.Item label="策划类型">{emptyTag(project.planningType)}</Descriptions.Item>
-                  <Descriptions.Item label="立项属性">{emptyTag(project.projectAttr)}</Descriptions.Item>
+                  <Descriptions.Item label="项目简介" span={4}>
+                    <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>{emptyTag(project.projectDesc)}</div>
+                  </Descriptions.Item>
+                </Descriptions>
+
+                {/* 在谈阶段信息 */}
+                <div style={sectionTitleStyle}>在谈阶段信息</div>
+                <Descriptions {...baseDescriptionsProps} style={{ marginBottom: 24 }}>
+                  <Descriptions.Item label="项目分类">{emptyTag(project.projectCategory)}</Descriptions.Item>
+                  <Descriptions.Item label="需投资金额(亿元)">{emptyTag(project.needInvestAmount)}</Descriptions.Item>
+                  <Descriptions.Item label="计划投资总额(亿元)">{emptyTag(project.investAmount)}</Descriptions.Item>
+                  <Descriptions.Item label="投资主体">{emptyTag(project.investorEntity)}</Descriptions.Item>
+                  <Descriptions.Item label="对接时间">{emptyTag(project.dockingDate)}</Descriptions.Item>
+                  <Descriptions.Item label="企业类别">{emptyTag(project.enterpriseCategory)}</Descriptions.Item>
+                  <Descriptions.Item label="是否为存量企业">{boolTag(project.isStock)}</Descriptions.Item>
+                  <Descriptions.Item label="注册资本(亿元)">{emptyTag(project.registeredCapitalAmount)}</Descriptions.Item>
+                  <Descriptions.Item label="是否飞地园区">{boolTag(project.isEnclave)}</Descriptions.Item>
+                  <Descriptions.Item label="是否产业外溢">{boolTag(project.isOverflow)}</Descriptions.Item>
+                  <Descriptions.Item label="楚商类型">{emptyTag(project.chuShangType)}</Descriptions.Item>
+                </Descriptions>
+
+                {/* 签约阶段信息 */}
+                <div style={sectionTitleStyle}>签约阶段信息</div>
+                <Descriptions {...baseDescriptionsProps} style={{ marginBottom: 24 }}>
                   <Descriptions.Item label="建设性质" span={2}>
                     <Space size={8}>
                       <span>{emptyTag(project.constructionNature)}</span>
@@ -381,77 +343,46 @@ export default function LuodiDetail() {
                     </Space>
                   </Descriptions.Item>
                   <Descriptions.Item label="招商类型">{emptyTag(project.merchantType)}</Descriptions.Item>
-                  <Descriptions.Item label="项目区域">{emptyTag(project.projectArea)}</Descriptions.Item>
-                  <Descriptions.Item label="建设地址" span={4}>{emptyTag(project.addressDetail)}</Descriptions.Item>
-                  <Descriptions.Item label="项目简介" span={4}>
-                    <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>{emptyTag(project.projectDesc)}</div>
-                  </Descriptions.Item>
-                </Descriptions>
-
-                {/* 项目分类指标 */}
-                <div style={sectionTitleStyle}>项目分类指标</div>
-                <Descriptions {...baseDescriptionsProps} style={{ marginBottom: 24 }}>
-                  <Descriptions.Item label="内外资">{emptyTag(project.domesticForeign)}</Descriptions.Item>
-                  <Descriptions.Item label="是否FDI">{boolTag(project.isFdi)}</Descriptions.Item>
-                  {project.isFdi === '是' ? (
-                    <Descriptions.Item label="FDI金额(万美元)">{emptyTag(project.fdiAmount)}</Descriptions.Item>
-                  ) : (
-                    <Descriptions.Item label="来源地">{emptyTag(project.sourceArea)}</Descriptions.Item>
-                  )}
-                  <Descriptions.Item label="产业类别">{emptyTag(project.industryCategory)}</Descriptions.Item>
-                  <Descriptions.Item label="行业类别">{emptyTag(project.industryType)}</Descriptions.Item>
-                  <Descriptions.Item label="对应965产业链">{emptyTag(project.chain965)}</Descriptions.Item>
-                  <Descriptions.Item label="所属五谷产业集群">{emptyTag(project.wugu)}</Descriptions.Item>
-                  <Descriptions.Item label="所属片区">{emptyTag(project.pianqu)}</Descriptions.Item>
+                  <Descriptions.Item label="招商类型说明">{emptyTag(project.merchantTypeDesc)}</Descriptions.Item>
+                  <Descriptions.Item label="是否浙商">{boolTag(project.isZheshang)}</Descriptions.Item>
                   <Descriptions.Item label="用地情况">{emptyTag(project.landSituation)}</Descriptions.Item>
-                  <Descriptions.Item label="用地/办公面积">{emptyTag(project.landArea)}</Descriptions.Item>
-                  <Descriptions.Item label="是否研发中心">{boolTag(project.isRnd)}</Descriptions.Item>
                   <Descriptions.Item label="是否总部经济">{boolTag(project.isHqEconomy)}</Descriptions.Item>
                   <Descriptions.Item label="总部经济类型">
-                    {project.isHqEconomy === '是' ? (
-                      <Space size={8}>
-                        <span>{emptyTag(project.hqEconomyLevel1)}</span>
-                        {project.hqEconomyLevel2 && project.hqEconomyLevel2 !== '-' ? (
-                          <><span style={{ color: '#8c8c8c' }}>/</span><span>{project.hqEconomyLevel2}</span></>
-                        ) : null}
+                    {project.isHqEconomy === '是'
+                      ? emptyTag([project.hqEconomyLevel1, project.hqEconomyLevel2].filter(v => v && v !== '-').join(' / '))
+                      : <span style={{ color: COLORS.textMuted }}>-</span>}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="备案证金额(亿元)">{emptyTag(project.recordAmount)}</Descriptions.Item>
+                  <Descriptions.Item label="固投金额(亿元)">{emptyTag(project.fixedInvestAmount)}</Descriptions.Item>
+                  <Descriptions.Item label="协议签订时间">{emptyTag(project.signDate)}</Descriptions.Item>
+                  <Descriptions.Item label="协议类型">{emptyTag(project.agreementType)}</Descriptions.Item>
+                  <Descriptions.Item label="是否注册">{boolTag(project.isRegister)}</Descriptions.Item>
+                  <Descriptions.Item label="注册时间">
+                    {project.isRegister === '是' ? emptyTag(project.registerDate) : <span style={{ color: COLORS.textMuted }}>-</span>}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="注册资本">
+                    {project.isRegister === '是' ? (
+                      <Space size={4}>
+                        <span>{emptyTag(project.registerCapitalAmount)}</span>
+                        {project.registerCapitalUnit && project.registerCapitalUnit !== '-' ? <span>{project.registerCapitalUnit}</span> : null}
                       </Space>
                     ) : <span style={{ color: COLORS.textMuted }}>-</span>}
                   </Descriptions.Item>
-                  <Descriptions.Item label="重点产业">{emptyTag(project.keyIndustry)}</Descriptions.Item>
-                  <Descriptions.Item label="楚商类型">{emptyTag(project.chuShangType)}</Descriptions.Item>
-                  <Descriptions.Item label="是否浙商">{boolTag(project.isZheshang)}</Descriptions.Item>
-                </Descriptions>
-
-                {/* 项目投资信息 */}
-                <div style={sectionTitleStyle}>项目投资信息</div>
-                <Descriptions {...baseDescriptionsProps} style={{ marginBottom: 24 }}>
-                  <Descriptions.Item label="计划投资总额(亿元)">{emptyTag(project.investAmount)}</Descriptions.Item>
-                  <Descriptions.Item label="备案证金额(亿元)">{emptyTag(project.recordAmount)}</Descriptions.Item>
-                  <Descriptions.Item label="固投金额(亿元)">{emptyTag(project.fixedInvestAmount)}</Descriptions.Item>
-                  <Descriptions.Item label="到资金额(亿元)">{emptyTag(project.arrivalAmount)}</Descriptions.Item>
-                  <Descriptions.Item label="现阶段到资(亿元)">{emptyTag(project.currentStageArrival)}</Descriptions.Item>
-                  <Descriptions.Item label="投资形态">{emptyTag(project.investForm)}</Descriptions.Item>
-                  <Descriptions.Item label="当年到资(亿元)">{emptyTag(project.yearArrivalAmount)}</Descriptions.Item>
-                  <Descriptions.Item label="预计年产值(亿元)">{emptyTag(project.expectAnnualOutput)}</Descriptions.Item>
-                  <Descriptions.Item label="预计年税收(亿元)">{emptyTag(project.expectAnnualTax)}</Descriptions.Item>
-                  <Descriptions.Item label="到位资金用途说明" span={3}>{emptyTag(project.arrivalUsage)}</Descriptions.Item>
-                </Descriptions>
-
-                {/* 投资主体及负责单位 */}
-                <div style={sectionTitleStyle}>投资主体及负责单位</div>
-                <Descriptions {...baseDescriptionsProps} labelStyle={{ width: 150, background: '#fafafa', fontWeight: 500 }}>
+                  <Descriptions.Item label="注册公司名称">
+                    {project.isRegister === '是' ? emptyTag(project.registerCompanyName) : <span style={{ color: COLORS.textMuted }}>-</span>}
+                  </Descriptions.Item>
                   <Descriptions.Item label="签约主体">{emptyTag(project.signSubject)}</Descriptions.Item>
-                  <Descriptions.Item label="签约主体信用代码">{emptyTag(project.creditCode)}</Descriptions.Item>
-                  <Descriptions.Item label="企业性质">{emptyTag(project.enterpriseNature)}</Descriptions.Item>
-                  <Descriptions.Item label="企业类别">{emptyTag(project.enterpriseCategory)}</Descriptions.Item>
-                  <Descriptions.Item label="投资主体">{emptyTag(project.investorEntity)}</Descriptions.Item>
-                  <Descriptions.Item label="投资主体社会信用代码">{emptyTag(project.investorEntityLicense)}</Descriptions.Item>
-                  <Descriptions.Item label="注册公司名称" span={2}>{emptyTag(project.registerCompanyName)}</Descriptions.Item>
-                  <Descriptions.Item label="注册资本" span={2}>{emptyTag(project.registerCapital)}</Descriptions.Item>
-                  <Descriptions.Item label="投资主体联系人">{emptyTag(project.investorContact)}</Descriptions.Item>
-                  <Descriptions.Item label="投资主体联系人电话">{emptyTag(project.investorPhone)}</Descriptions.Item>
-                  <Descriptions.Item label="负责单位">{emptyTag(project.responsibleUnit)}</Descriptions.Item>
-                  <Descriptions.Item label="区级责任领导">{emptyTag(project.districtLeader)}</Descriptions.Item>
+                </Descriptions>
+
+                {/* 落地阶段信息（转落地填写） */}
+                <div style={sectionTitleStyle}>落地阶段信息</div>
+                <Descriptions {...baseDescriptionsProps} style={{ marginBottom: 24 }}>
+                  <Descriptions.Item label="开工开业类型">
+                    {project.startWorkType && project.startWorkType !== '-' ? (
+                      <Tag color="cyan" style={{ margin: 0 }}>{project.startWorkType}</Tag>
+                    ) : emptyTag(project.startWorkType)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="开工/开业时间">{emptyTag(project.startWorkDate)}</Descriptions.Item>
                 </Descriptions>
               </div>
             ),
@@ -568,7 +499,7 @@ export default function LuodiDetail() {
       {/* 编辑落地信息弹窗（前期阶段字段只读，仅落地阶段字段可编辑） */}
       <LuodiEditModal
         open={editModalVisible}
-        projectData={{ ...project._raw, _formValues: formValues }}
+        projectData={{ ...project._raw, responsibleUnits: project.responsibleUnits, _formValues: formValues }}
         onCancel={() => setEditModalVisible(false)}
         onOk={handleEditOk}
       />

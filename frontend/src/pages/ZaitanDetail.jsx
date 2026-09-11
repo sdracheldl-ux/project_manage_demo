@@ -1,14 +1,14 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  Tabs, Descriptions, Button, Space, Modal, Form, Input, Select, Row, Col,
-  Timeline, message, DatePicker, Tag, Empty, Popconfirm, Dropdown
+  Tabs, Descriptions, Button, Space, Modal, Form, Input,
+  Timeline, message, Tag, Empty, Dropdown
 } from 'antd'
 import {
   ArrowLeftOutlined, EditOutlined, PlusOutlined, DeleteOutlined,
   ExportOutlined, PauseCircleOutlined, SendOutlined, SettingOutlined,
   CheckCircleOutlined, MessageOutlined, PaperClipOutlined, ExclamationCircleOutlined,
-  RobotOutlined, MoreOutlined
+  RobotOutlined, MoreOutlined, SwapOutlined
 } from '@ant-design/icons'
 import mockData from '../mock/data.json'
 import DecisionFlow, { getDecisionNodes } from '../components/DecisionFlow'
@@ -17,10 +17,12 @@ import ZaitanEditModal from '../components/ZaitanEditModal'
 import AssignModal from '../components/AssignModal'
 import FeedbackModal from '../components/FeedbackModal'
 import ZhuanQianyueModal from '../components/ZhuanQianyueModal'
+import TransferZaitanModal from '../components/TransferZaitanModal'
 import ProgressTimeline from '../components/ProgressTimeline'
 import ProgressSummaryModal from '../components/ProgressSummaryModal'
-import { useViewRole, msgStore } from '../store/viewStore'
+import { useViewRole, msgStore, transferStore, useTransferStore } from '../store/viewStore'
 import { findUnitByKey } from '../constants/assignConfig'
+import { RESPONSIBLE_UNIT_OPTIONS, normalizeResponsibleUnits, DISTRICT_CODE_SEEDS } from '../constants/projectEnums'
 import {
   COLORS,
   sectionTitleStyle,
@@ -35,26 +37,40 @@ import {
   PROGRESS_TYPE,
 } from '../constants/uiStyles'
 
-const { TextArea } = Input
-
 const CURRENT_USER = '投促局管理员'
-const ENTERPRISE_NATURE = ['国企（央企）', '国企（地方）', '民企', '外企']
-const ENTERPRISE_CATEGORY = ['世界500强', '中国500强', '民营500强', '上市公司', '国家级高新技术企业', '专精特新', '其他']
-const ZHAOSHANG_TYPE = ['驻点招商', '以商招商', '活动招商', '校友招商', '平台招商', '其他']
-const STOCK_TYPE = ['本土成长', '外地存量扩能', '其他']
-const WUGU = ['光谷科创大走廊', '车谷', '网谷', '星谷', '康养谷']
-const AREA = ['东湖高新区', '武汉经开区', '临空港经开区', '江岸区', '江汉区', '硚口区', '汉阳区', '武昌区', '青山区', '洪山区', '蔡甸区', '江夏区', '东西湖区', '汉南区', '黄陂区', '新洲区']
-const JIANBAN_LEVEL = ['书记', '市长', '副市长', '非领导交办', '区主要领导', '区分管领导', '区投促局领导']
-const JIANSHE_TYPE = ['新建', '扩建', '改建', '技术改造', '其他']
-const CHUSHANG_TYPE = ['湖北籍企业家', '武汉校友', '非楚商']
-const INDUSTRY_CATEGORY = ['农业', '工业', '服务业']
-const DOMESTIC_FOREIGN = ['内资', '外资']
 
-function formatDate(d) {
-  if (!d) return '-'
-  const date = d instanceof Date ? d : new Date(d)
-  const pad = (n) => String(n).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+// 相对当前时间生成 'YYYY-MM-DD HH:mm'（n 支持小数天，用于 mock 种子时间）
+function daysAgoStr(n) {
+  const d = new Date(Date.now() - n * 86400000)
+  const pad = x => String(x).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+// 反馈达标状态：自分派时间（或最近一次反馈时间）起算，超过 feedbackEveryXDays 天未反馈即逾期
+// 返回 { due: 剩余天数(含小数), status: 'overdue' | 'dueSoon'(剩余≤1天) | 'ok', lastFeedbackTime }
+function getFeedbackDueInfo(record) {
+  const x = record.feedbackEveryXDays || 15
+  const baseStr = (record.feedbacks && record.feedbacks.length > 0)
+    ? record.feedbacks[record.feedbacks.length - 1].time
+    : record.assignTime
+  const base = new Date(String(baseStr).replace(/-/g, '/')).getTime()
+  const due = (base + x * 86400000 - Date.now()) / 86400000
+  const status = due <= 0 ? 'overdue' : due <= 1 ? 'dueSoon' : 'ok'
+  return { due, status, lastFeedbackTime: record.feedbacks?.length ? baseStr : null }
+}
+
+// 责任单位 Tag 展示：空显示 '-'，最多显示 3 个，超出 +N
+const unitTagStyle = { color: '#1677ff', background: '#e6f4ff', borderColor: '#91caff' }
+const renderUnits = (v) => {
+  const units = normalizeResponsibleUnits(v)
+  if (units.length === 0) return <span style={{ color: '#bfbfbf' }}>-</span>
+  const shown = units.slice(0, 3)
+  return (
+    <>
+      {shown.map(u => <Tag key={u} style={unitTagStyle}>{u}</Tag>)}
+      {units.length > 3 && <Tag style={unitTagStyle}>+{units.length - shown.length}</Tag>}
+    </>
+  )
 }
 
 // 根据已通过节点构建展示节点列表
@@ -73,64 +89,46 @@ export default function ZaitanDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const [basicForm] = Form.useForm()
   const [progressForm] = Form.useForm()
   const { role, isSponsor, myDeptKey } = useViewRole()
+  // 订阅移交记录变化
+  useTransferStore()
 
-  // 构造mock项目数据
-  const [project, setProject] = useState(() => {
+  // 构造mock项目数据（与在谈精简字段集对齐）
+  const [project] = useState(() => {
     const categories = ['政策类', '投资类', '供地类', '其他']
     const item = mockData.zaitan.find(i => String(i.id) === String(id)) || mockData.zaitan[0]
     const idx = mockData.zaitan.findIndex(i => i.id === item.id)
     const cat = categories[idx % 4]
     return {
       key: String(item.id),
+      districtProjectCode: item['区级项目编码'] || DISTRICT_CODE_SEEDS[idx % DISTRICT_CODE_SEEDS.length],
       projectName: item['项目名称'],
       projectStatus: '在谈',
       reporter: item['申报人'] || '-',
       sourceArea: item['来源地'] || '-',
       domesticForeign: item['内外资'] || '内资',
       industryType: item['行业类别'] || '-',
-      chain965: item['对应"965"产业链类别'] || '-',
       industryCategory: item['产业类别'] || '工业',
       projectDesc: item['项目简介'] || '-',
       investorEntity: item['投资主体'] || '-',
-      investorContactPerson: item['投资主体联系人'] || '-',
-      investorContactPhone: '18612345625',
       investAmount: item['投资金额（亿元）'] || 0,
-      enterpriseNature: item['企业性质'] || '民企',
-      enterpriseCategory: item['企业类别'] || '国家级高新技术企业',
       reportTime: item['申报时间'] || '-',
       projectCategory: cat,
-      assignedLevel: item['交办层级'] || '非领导交办',
-      cityContact: item['市投促局联络人'] || '-',
-      districtLeader: '周玲玲',
-      districtLeaderPhone: '15600355959',
-      districtContact: '易成豪',
-      districtContactPhone: '17107815204',
-      reportContact: '蔡威',
-      reportContactPhone: '13800000000',
-      contactTime: '2026-05-08',
+      // ===== 在谈字段（存量行补种子）=====
+      needInvestAmount: cat === '投资类' ? [1.2, 2.5, 0.8, 3.2][idx % 4] : undefined,
+      secondaryIndustryCategory: ['生物医药', '智能机器人', '先进半导体', '高端医疗器械'][idx % 4],
+      contactTime: item['对接时间'] || ['2026-05-08', '2026-05-12', '2026-04-20', '2026-05-06'][idx % 4],
+      enterpriseCategory: item['企业类别'] || '国家级高新技术企业',
       isStock: '否',
-      stockType: undefined,
-      firstInvestYear: '2026',
-      registerCapital: 1000,
-      zhaoshangType: '驻点招商',
-      zhaoshangTypeDesc: '驻沪办对接',
-      isYanpan: '否',
-      isEnclave: '否',
-      isRnd: '否',
-      isAdvancedMfg: '否',
-      isWaitao: '否',
-      waitaoSource: undefined,
-      wuguCluster: '光谷科创大走廊',
-      pianqu: '东湖高新区',
-      jiansheType: '新建',
-      chushangType: '非楚商',
-      natongName: '',
-      natongAmount: undefined,
-      chushangBasicInfo: '',
-      phoneVerify: '已核实',
+      registeredCapitalAmount: item['注册资本'] || [0.1, 0.5, 0.08, 0.2][idx % 4],
+      isEnclave: item['是否飞地园区'] || '否',
+      isOverflow: item['是否产业外溢'] || (idx % 2 === 0 ? '是' : '否'),
+      chushangType: item['楚商类型'] || ['湖北籍企业家', '武汉校友', '非楚商', '泛楚商'][idx % 4],
+      // 存量行无责任单位时给默认种子，保证演示展示有值
+      responsibleUnits: normalizeResponsibleUnits(item['责任单位']).length
+        ? normalizeResponsibleUnits(item['责任单位'])
+        : [RESPONSIBLE_UNIT_OPTIONS[idx % RESPONSIBLE_UNIT_OPTIONS.length]],
     }
   })
 
@@ -146,9 +144,20 @@ export default function ZaitanDetail() {
   const displayDecisionNodes = buildDisplayNodes(baseDecisionNodes, decisionPassed)
   const canUpdateDecision = !!baseDecisionNodes
 
-  // 进展列表，包含系统事件（创建/导入/决策节点初始通过）、谋划阶段历史进展、在谈阶段进展
+  // 进展列表，包含系统事件（创建/导入/决策节点初始通过/移交）、谋划阶段历史进展、在谈阶段进展
   const [progressList, setProgressList] = useState(() => {
     const initList = []
+    // 系统事件：项目移交（从全局移交store回放，保证双方会话均可见）
+    const transferRecord = transferStore.getTransferByProject(project.key)
+    if (transferRecord) {
+      initList.push({
+        id: 'sys-transfer',
+        type: PROGRESS_TYPE.SYSTEM,
+        content: `项目已移交至「${transferRecord.toDeptName}」` + (transferRecord.reason ? `，移交说明：${transferRecord.reason}` : ''),
+        reporter: transferRecord.by,
+        updateTime: transferRecord.time,
+      })
+    }
     // 系统事件：由谋划阶段转入在谈（阶段推进动作，由项目经办人操作）
     initList.push({
       id: 'sys-import-zaitan',
@@ -215,7 +224,6 @@ export default function ZaitanDetail() {
   })
 
   const [activeTab, setActiveTab] = useState('basic')
-  const [editModalVisible, setEditModalVisible] = useState(false)
   const [zaitanEditVisible, setZaitanEditVisible] = useState(false)
   const [progressModalVisible, setProgressModalVisible] = useState(false)
   const [decisionModalVisible, setDecisionModalVisible] = useState(false)
@@ -223,26 +231,29 @@ export default function ZaitanDetail() {
   const [feedbackModalVisible, setFeedbackModalVisible] = useState(false)
   const [aiVisible, setAiVisible] = useState(false)
   const [zhuanQianyueVisible, setZhuanQianyueVisible] = useState(false)
+  const [transferVisible, setTransferVisible] = useState(false)
   const [tuikuVisible, setTuikuVisible] = useState(false)
   const [tuikuReason, setTuikuReason] = useState('')
   const [feedbackTarget, setFeedbackTarget] = useState(null) // 当前要反馈的分派记录id
   const [editingProgress, setEditingProgress] = useState(null)
-  const [editLoading, setEditLoading] = useState(false)
   const [progressLoading, setProgressLoading] = useState(false)
 
-  // 分派记录（新结构：拆分到单位、支持多条反馈、附件）
+  // 分派记录（新结构：拆分到单位、支持多条反馈、附件、反馈频率要求）
+  // 时间用相对当前天数生成，保证反馈达标/催办状态演示效果稳定
   const [assignList, setAssignList] = useState(() => [
     {
       id: 'a-kcj', toDeptKey: 'kcj', fromDeptName: '市投促局', toDeptName: '科创局',
-      assignTime: '2026-08-28 10:30',
+      assignTime: daysAgoStr(1),
       content: '请协助对接高企认定政策，评估该企业入选光谷英才计划的可能性，并提供对接建议。',
       attachments: [],
+      feedbackEveryXDays: 15,
       status: 'processing', // processing / done
-      acceptTime: '2026-08-28 14:10',
+      acceptTime: daysAgoStr(1),
       finishTime: null,
+      reminderSent: true,
       feedbacks: [
         {
-          id: 'fb-1', user: '科创局-王科长', time: '2026-08-28 15:20',
+          id: 'fb-1', user: '科创局-王科长', time: daysAgoStr(0.4),
           content: '已与企业初步对接，该企业技术创新能力较强，符合高企认定基本条件，已安排专人下周对接光谷英才申报材料准备。',
           attachments: [],
         },
@@ -250,28 +261,32 @@ export default function ZaitanDetail() {
     },
     {
       id: 'a-qfj', toDeptKey: 'qfj', fromDeptName: '市投促局', toDeptName: '企服局',
-      assignTime: '2026-08-28 10:30',
+      assignTime: daysAgoStr(14),
       content: '企业计划投资建设AI药物研发平台，请评估该项目纳入亿元以上技改项目或光电子信息重大专项的可能性。',
       attachments: [],
+      feedbackEveryXDays: 15,
       status: 'processing',
       acceptTime: null, finishTime: null, feedbacks: [],
+      reminderSent: false, // 距反馈截止剩1天 → 打开详情时触发催办提醒
     },
     {
       id: 'a-wljs', toDeptKey: 'wljs', fromDeptName: '市投促局', toDeptName: '未来科技城',
-      assignTime: '2026-08-25 09:00',
+      assignTime: daysAgoStr(20),
       content: '企业有意向选址未来科技城，请对接合适的楼宇载体，并提供租金优惠方案。',
       attachments: [],
+      feedbackEveryXDays: 15,
       status: 'done',
-      acceptTime: '2026-08-25 10:00',
-      finishTime: '2026-08-27 17:30',
+      acceptTime: daysAgoStr(20),
+      finishTime: daysAgoStr(5),
+      reminderSent: true,
       feedbacks: [
         {
-          id: 'fb-2', user: '未来科技城-陈主任', time: '2026-08-25 16:30',
+          id: 'fb-2', user: '未来科技城-陈主任', time: daysAgoStr(18),
           content: '已初步对接2处载体，A6栋3000㎡、B2栋4500㎡，均符合生物医药研发用房需求，租金可按一类企业标准给予30%优惠。',
           attachments: [],
         },
         {
-          id: 'fb-3', user: '未来科技城-陈主任', time: '2026-08-27 17:30',
+          id: 'fb-3', user: '未来科技城-陈主任', time: daysAgoStr(5),
           content: '企业已实地考察A6栋，双方初步达成入驻意向，后续对接已交招商部继续跟进，本任务完成。',
           attachments: [],
         },
@@ -286,7 +301,13 @@ export default function ZaitanDetail() {
   }, [assignList, isSponsor, myDeptKey])
 
   // 接收方视角下，该项目是否分派给自己（决定详情页是否有权限查看）
-  const hasAccess = isSponsor || assignList.some(a => a.toDeptKey === myDeptKey)
+  // 查看权限：发起方 ∪ 分派给我的 ∪ 移交给我的
+  const transferRecordForAccess = transferStore.getTransferByProject(project.key)
+  const hasAccess = isSponsor
+    || assignList.some(a => a.toDeptKey === myDeptKey)
+    || (transferRecordForAccess && transferRecordForAccess.toDeptKey === myDeptKey)
+  // 项目已移交给当前园区 → 接收方获得操作权限（双方共同管理）
+  const isTransferredToMe = !isSponsor && !!transferRecordForAccess && transferRecordForAccess.toDeptKey === myDeptKey
 
   // URL参数触发对应操作
   useEffect(() => {
@@ -302,29 +323,32 @@ export default function ZaitanDetail() {
     }
   }, [searchParams, hasAccess])
 
+  // 催办提醒（demo 惰性触发，无定时任务）：距反馈截止不足1天的进行中任务，进入详情时给接收方补发一条催办消息（每条任务只发一次）
+  useEffect(() => {
+    if (!isSponsor) return
+    const toRemind = assignList.filter(a =>
+      a.status === 'processing' && !a.reminderSent && getFeedbackDueInfo(a).status === 'dueSoon'
+    )
+    if (toRemind.length === 0) return
+    toRemind.forEach(a => {
+      msgStore.addMessage({
+        toDeptKey: a.toDeptKey,
+        title: '【反馈催办提醒】',
+        content: `"${project.projectName}"的协作任务反馈即将到期（要求每${a.feedbackEveryXDays}天至少提交1次反馈），请尽快提交反馈。`,
+        projectId: project.key,
+        projectName: project.projectName,
+        type: 'reminder',
+      })
+    })
+    setAssignList(prev => prev.map(a =>
+      toRemind.some(t => t.id === a.id) ? { ...a, reminderSent: true } : a
+    ))
+  }, [assignList, isSponsor])
+
   const handleBack = () => navigate('/project/zaitan')
 
   const handleEditBasic = () => {
     setZaitanEditVisible(true)
-  }
-
-  const handleEditOk = async () => {
-    try {
-      const values = await basicForm.validateFields()
-      setEditLoading(true)
-      setProject(prev => ({
-        ...prev,
-        ...values,
-        contactTime: values.contactDate ? formatDate(values.contactDate) : prev.contactTime,
-        foundDate: values.foundDate ? formatDate(values.foundDate) : prev.foundDate,
-      }))
-      message.success('基础信息已更新')
-      setEditModalVisible(false)
-    } catch (e) {
-      // validation error
-    } finally {
-      setEditLoading(false)
-    }
   }
 
   const handleAddProgress = () => {
@@ -429,36 +453,44 @@ export default function ZaitanDetail() {
   }
 
   // 提交分派
-  const handleAssignOk = ({ targets, content, attachments }) => {
+  const handleAssignOk = ({ groups, attachments }) => {
     const now = new Date()
     const pad = n => String(n).padStart(2, '0')
     const timeStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`
-    const newRecords = targets.map((t, idx) => ({
-      id: `a-${Date.now()}-${idx}`,
-      toDeptKey: t.unitKey,
-      fromDeptName: '市投促局',
-      toDeptName: t.unitName,
-      assignTime: timeStr,
-      content,
-      attachments,
-      status: 'processing',
-      acceptTime: null,
-      finishTime: null,
-      feedbacks: [],
-    }))
+    const newRecords = []
+    groups.forEach((g, gi) => {
+      g.units.forEach((unitKey, ui) => {
+        const u = findUnitByKey(unitKey)
+        newRecords.push({
+          id: `a-${Date.now()}-${gi}-${ui}`,
+          toDeptKey: unitKey,
+          fromDeptName: '市投促局',
+          toDeptName: u ? u.name : unitKey,
+          assignTime: timeStr,
+          content: g.content,
+          attachments,
+          feedbackEveryXDays: g.feedbackEveryXDays || 15,
+          status: 'processing',
+          acceptTime: null,
+          finishTime: null,
+          feedbacks: [],
+          reminderSent: false, // 催办提醒（提前1天）是否已发送
+        })
+      })
+    })
     setAssignList(prev => [...newRecords, ...prev])
-    // 给每个接收单位发一条站内信
-    targets.forEach(t => {
+    // 给每个接收单位发一条站内信（含反馈频率要求）
+    newRecords.forEach(r => {
       msgStore.addMessage({
-        toDeptKey: t.unitKey,
+        toDeptKey: r.toDeptKey,
         title: '【协作任务分派】',
-        content: `您有一条来自"市投促局"的"${project.projectName}"协作配合任务，请及时查看并跟进处理。`,
+        content: `您有一条来自"市投促局"的"${project.projectName}"协作配合任务，请每${r.feedbackEveryXDays}天至少提交1次反馈，请及时查看并跟进处理。`,
         projectId: project.key,
         projectName: project.projectName,
         type: 'assign',
       })
     })
-    message.success(`已成功分派给 ${targets.length} 个单位`)
+    message.success(`已成功分派给 ${newRecords.length} 个单位`)
     setAssignModalVisible(false)
     setActiveTab('assign')
   }
@@ -527,9 +559,6 @@ export default function ZaitanDetail() {
 
 
 
-  const formItemLayout = { labelCol: { span: 8 }, wrapperCol: { span: 16 } }
-  const colProps = { span: 12 }
-
   return (
     <div className="page-container">
       <div className="table-card" style={pageCardStyle}>
@@ -543,7 +572,8 @@ export default function ZaitanDetail() {
             <Tag color="blue" style={{ background: COLORS.primaryLight, color: COLORS.primary, border: `1px solid ${COLORS.primaryBorder}`, margin: 0 }}>{project.projectStatus}</Tag>
           </div>
           <Space size={8}>
-            {isSponsor && (
+            {/* 操作区：发起方，或项目已移交给当前园区的接收方（双方均可操作） */}
+            {(isSponsor || isTransferredToMe) && (
               <>
                 <Button type="primary" icon={<PlusOutlined />} onClick={handleAddProgress}>
                   进展汇报
@@ -556,9 +586,11 @@ export default function ZaitanDetail() {
                     更新决策节点
                   </Button>
                 )}
-                <Button icon={<SendOutlined />} onClick={handleAssign}>
-                  分派
-                </Button>
+                {isSponsor && (
+                  <Button icon={<SendOutlined />} onClick={handleAssign}>
+                    分派
+                  </Button>
+                )}
                 <Button icon={<ExportOutlined />} onClick={handleToQianyue}>
                   转签约
                 </Button>
@@ -567,11 +599,16 @@ export default function ZaitanDetail() {
                   menu={{
                     items: [
                       { key: 'edit', icon: <EditOutlined />, label: '编辑' },
+                      // 移交：仅发起方、且该项目未移交过（仅支持一次），位于编辑之后
+                      ...(isSponsor && !transferStore.hasTransferred(project.key)
+                        ? [{ key: 'transfer', icon: <SwapOutlined />, label: '移交' }]
+                        : []),
                       { type: 'divider' },
                       { key: 'tuiku', icon: <PauseCircleOutlined style={{ color: '#ff4d4f' }} />, label: '标记退库' },
                     ],
                     onClick: ({ key }) => {
                       if (key === 'edit') handleEditBasic()
+                      else if (key === 'transfer') setTransferVisible(true)
                       else if (key === 'tuiku') { setTuikuReason(''); setTuikuVisible(true) }
                     },
                   }}
@@ -580,7 +617,8 @@ export default function ZaitanDetail() {
                 </Dropdown>
               </>
             )}
-            {!isSponsor && (
+            {/* 无操作权限的接收方（仅分派关系）保持只读提示 */}
+            {!isSponsor && !isTransferredToMe && (
               <Tag color="orange" style={{ fontSize: 12, padding: '4px 10px' }}>
                 当前为接收方视角：{role.deptName}-{role.userName}，仅可查看项目信息并反馈分派任务
               </Tag>
@@ -626,48 +664,37 @@ export default function ZaitanDetail() {
                     labelStyle={{ width: 150, background: '#fafafa', fontWeight: 500 }}
                     contentStyle={{ minWidth: 200 }}
                   >
+                    <Descriptions.Item label="区级项目编码">{project.districtProjectCode || '-'}</Descriptions.Item>
                     <Descriptions.Item label="项目名称">{project.projectName}</Descriptions.Item>
                     <Descriptions.Item label="项目分类">{project.projectCategory}</Descriptions.Item>
-                    <Descriptions.Item label="申报人">{project.reporter}</Descriptions.Item>
-                    <Descriptions.Item label="申报时间">{project.reportTime}</Descriptions.Item>
+                    <Descriptions.Item label="需投资金额(亿元)">
+                      {project.needInvestAmount != null && project.needInvestAmount !== ''
+                        ? Number(project.needInvestAmount).toFixed(2)
+                        : <span style={{ color: '#bfbfbf' }}>-</span>}
+                    </Descriptions.Item>
                     <Descriptions.Item label="内外资">{project.domesticForeign}</Descriptions.Item>
                     <Descriptions.Item label="来源地">{project.sourceArea}</Descriptions.Item>
                     <Descriptions.Item label="产业类别">{project.industryCategory}</Descriptions.Item>
                     <Descriptions.Item label="行业类别">{project.industryType}</Descriptions.Item>
-                    <Descriptions.Item label="对应965产业链">{project.chain965}</Descriptions.Item>
+                    <Descriptions.Item label="次要行业类别">{project.secondaryIndustryCategory || '-'}</Descriptions.Item>
                     <Descriptions.Item label="投资主体">{project.investorEntity}</Descriptions.Item>
-                    <Descriptions.Item label="投资主体联系人">{project.investorContactPerson}</Descriptions.Item>
-                    <Descriptions.Item label="联系电话">{project.investorContactPhone}</Descriptions.Item>
-                    <Descriptions.Item label="计划投资总额(亿元)">{project.investAmount}</Descriptions.Item>
                     <Descriptions.Item label="对接时间">{project.contactTime}</Descriptions.Item>
-                    <Descriptions.Item label="招商类型">{project.zhaoshangType}</Descriptions.Item>
-                    <Descriptions.Item label="招商类型说明">{project.zhaoshangTypeDesc}</Descriptions.Item>
-                    <Descriptions.Item label="企业性质">{project.enterpriseNature}</Descriptions.Item>
-                    <Descriptions.Item label="企业类别">{project.enterpriseCategory}</Descriptions.Item>
+                    <Descriptions.Item label="计划投资总额(亿元)">
+                      {Number(project.investAmount).toFixed(2)}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="责任单位">{renderUnits(project.responsibleUnits)}</Descriptions.Item>
+                    <Descriptions.Item label="企业类别">{project.enterpriseCategory || '-'}</Descriptions.Item>
                     <Descriptions.Item label="是否为存量企业">{project.isStock}</Descriptions.Item>
-                    <Descriptions.Item label="存量企业类型">{project.stockType || '-'}</Descriptions.Item>
-                    <Descriptions.Item label="首次投资年份">{project.firstInvestYear}</Descriptions.Item>
-                    <Descriptions.Item label="注册资本(亿元)">{project.registerCapital}</Descriptions.Item>
-                    <Descriptions.Item label="所属五谷产业集群">{project.wuguCluster}</Descriptions.Item>
-                    <Descriptions.Item label="所属片区">{project.pianqu}</Descriptions.Item>
-                    <Descriptions.Item label="建设性质">{project.jiansheType}</Descriptions.Item>
-                    <Descriptions.Item label="交办层级">{project.assignedLevel}</Descriptions.Item>
-                    <Descriptions.Item label="区级责任领导人">{project.districtLeader}</Descriptions.Item>
-                    <Descriptions.Item label="区级责任领导人电话">{project.districtLeaderPhone}</Descriptions.Item>
-                    <Descriptions.Item label="区投促局责任人">{project.districtContact}</Descriptions.Item>
-                    <Descriptions.Item label="区投促局责任人电话">{project.districtContactPhone}</Descriptions.Item>
-                    <Descriptions.Item label="市投促局联络人">{project.cityContact}</Descriptions.Item>
-                    <Descriptions.Item label="报送联络人">{project.reportContact}</Descriptions.Item>
-                    <Descriptions.Item label="报送联络人电话">{project.reportContactPhone}</Descriptions.Item>
-                    <Descriptions.Item label="电话核实情况">{project.phoneVerify}</Descriptions.Item>
-                    <Descriptions.Item label="是否研判">{project.isYanpan}</Descriptions.Item>
+                    <Descriptions.Item label="注册资本(亿元)">
+                      {project.registeredCapitalAmount != null && project.registeredCapitalAmount !== ''
+                        ? Number(project.registeredCapitalAmount).toFixed(2)
+                        : <span style={{ color: '#bfbfbf' }}>-</span>}
+                    </Descriptions.Item>
                     <Descriptions.Item label="是否飞地园区">{project.isEnclave}</Descriptions.Item>
-                    <Descriptions.Item label="是否研发中心">{project.isRnd}</Descriptions.Item>
-                    <Descriptions.Item label="是否先进制造业">{project.isAdvancedMfg}</Descriptions.Item>
-                    <Descriptions.Item label="是否产业外溢">{project.isWaitao}</Descriptions.Item>
-                    <Descriptions.Item label="楚商类型">{project.chushangType}</Descriptions.Item>
-                    <Descriptions.Item label="纳统项目名称">{project.natongName || '-'}</Descriptions.Item>
-                    <Descriptions.Item label="纳统计划总投资额(万元)">{project.natongAmount ?? '-'}</Descriptions.Item>
+                    <Descriptions.Item label="是否产业外溢">{project.isOverflow || '-'}</Descriptions.Item>
+                    <Descriptions.Item label="楚商类型">{project.chushangType || '-'}</Descriptions.Item>
+                    <Descriptions.Item label="申报人 / 申报时间">{project.reporter} / {project.reportTime}</Descriptions.Item>
+                    {/* 项目简介：置于最底部，独立通栏一行 */}
                     <Descriptions.Item label="项目简介" span={2}>
                       <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>{project.projectDesc}</div>
                     </Descriptions.Item>
@@ -742,9 +769,28 @@ export default function ZaitanDetail() {
                                   </Space>
                                 )}
                               </div>
-                              <div style={{ fontSize: 12, color: '#bfbfbf', marginBottom: 8 }}>
-                                分派时间：{item.assignTime}
-                                {item.finishTime && <span style={{ marginLeft: 16 }}>完成时间：{item.finishTime}</span>}
+                              <div style={{ fontSize: 12, color: '#bfbfbf', marginBottom: 8, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                                <span>分派时间：{item.assignTime}</span>
+                                {item.finishTime && <span>完成时间：{item.finishTime}</span>}
+                                {/* 反馈频率要求 */}
+                                <Tag style={{ marginInlineEnd: 0, fontSize: 12, background: '#f9f0ff', color: '#722ed1', border: '1px solid #d3adf7' }}>
+                                  ⏱ 每{item.feedbackEveryXDays || 15}天至少反馈1次
+                                </Tag>
+                                {/* 反馈达标状态（仅进行中任务） */}
+                                {!isDone && (() => {
+                                  const dueInfo = getFeedbackDueInfo(item)
+                                  if (dueInfo.status === 'overdue') {
+                                    return <Tag color="red" style={{ marginInlineEnd: 0 }}>已超期未反馈</Tag>
+                                  }
+                                  if (dueInfo.status === 'dueSoon') {
+                                    return <Tag color="orange" style={{ marginInlineEnd: 0 }}>即将到期，请尽快反馈</Tag>
+                                  }
+                                  return (
+                                    <Tag style={{ marginInlineEnd: 0, background: '#fafafa', color: '#8c8c8c', border: '1px solid #f0f0f0' }}>
+                                      {dueInfo.lastFeedbackTime ? `反馈达标 · 最近反馈 ${dueInfo.lastFeedbackTime}` : `暂无反馈 · 剩余${Math.ceil(dueInfo.due)}天`}
+                                    </Tag>
+                                  )
+                                })()}
                               </div>
 
                               {/* 协同事项说明 */}
@@ -842,99 +888,6 @@ export default function ZaitanDetail() {
         )}
       </div>
 
-      {/* 编辑基础信息弹窗 */}
-      <Modal
-        title="编辑基础信息"
-        open={editModalVisible}
-        onOk={handleEditOk}
-        onCancel={() => setEditModalVisible(false)}
-        confirmLoading={editLoading}
-        okText="保存" cancelText="取消"
-        width={960}
-        destroyOnClose
-        bodyStyle={{ padding: '24px', maxHeight: '70vh', overflowY: 'auto' }}
-      >
-        <Form form={basicForm} {...formItemLayout} layout="horizontal" requiredMark={true} colon={false}>
-          <Row gutter={24}>
-            <Col {...colProps}>
-              <Form.Item label="项目名称" name="projectName" rules={[{ required: true, message: '请输入项目名称' }]}>
-                <Input placeholder="请输入项目名称" />
-              </Form.Item>
-            </Col>
-            <Col {...colProps}>
-              <Form.Item label="项目分类" name="projectCategory" rules={[{ required: true }]}>
-                <Select options={['政策类', '投资类', '供地类', '其他'].map(v => ({ label: v, value: v }))} />
-              </Form.Item>
-            </Col>
-            <Col {...colProps}>
-              <Form.Item label="内外资" name="domesticForeign" rules={[{ required: true }]}>
-                <Select options={DOMESTIC_FOREIGN.map(v => ({ label: v, value: v }))} />
-              </Form.Item>
-            </Col>
-            <Col {...colProps}>
-              <Form.Item label="来源地" name="sourceArea">
-                <Input placeholder="请输入来源地" />
-              </Form.Item>
-            </Col>
-            <Col {...colProps}>
-              <Form.Item label="产业类别" name="industryCategory" rules={[{ required: true }]}>
-                <Select options={INDUSTRY_CATEGORY.map(v => ({ label: v, value: v }))} />
-              </Form.Item>
-            </Col>
-            <Col {...colProps}>
-              <Form.Item label="行业类别" name="industryType">
-                <Input placeholder="请输入行业类别" />
-              </Form.Item>
-            </Col>
-            <Col {...colProps}>
-              <Form.Item label="投资主体" name="investorEntity" rules={[{ required: true }]}>
-                <Input placeholder="请输入投资主体" />
-              </Form.Item>
-            </Col>
-            <Col {...colProps}>
-              <Form.Item label="投资主体联系人" name="investorContactPerson">
-                <Input placeholder="请输入联系人" />
-              </Form.Item>
-            </Col>
-            <Col {...colProps}>
-              <Form.Item label="联系电话" name="investorContactPhone" rules={[{ pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号' }]}>
-                <Input placeholder="请输入联系电话" />
-              </Form.Item>
-            </Col>
-            <Col {...colProps}>
-              <Form.Item label="计划投资总额" name="investAmount" rules={[{ required: true }]}>
-                <Input type="number" addonAfter="亿元" min={0} />
-              </Form.Item>
-            </Col>
-            <Col {...colProps}>
-              <Form.Item label="对接时间" name="contactDate">
-                <DatePicker style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col {...colProps}>
-              <Form.Item label="招商类型" name="zhaoshangType" rules={[{ required: true }]}>
-                <Select options={ZHAOSHANG_TYPE.map(v => ({ label: v, value: v }))} />
-              </Form.Item>
-            </Col>
-            <Col {...colProps}>
-              <Form.Item label="企业性质" name="enterpriseNature" rules={[{ required: true }]}>
-                <Select options={ENTERPRISE_NATURE.map(v => ({ label: v, value: v }))} />
-              </Form.Item>
-            </Col>
-            <Col {...colProps}>
-              <Form.Item label="企业类别" name="enterpriseCategory" rules={[{ required: true }]}>
-                <Select options={ENTERPRISE_CATEGORY.map(v => ({ label: v, value: v }))} />
-              </Form.Item>
-            </Col>
-            <Col span={24}>
-              <Form.Item label="项目简介" name="projectDesc" labelCol={{ span: 4 }} wrapperCol={{ span: 20 }}>
-                <TextArea rows={4} placeholder="请输入项目简介" maxLength={999} showCount />
-              </Form.Item>
-            </Col>
-          </Row>
-        </Form>
-      </Modal>
-
       {/* 进展汇报/编辑弹窗 */}
       <Modal
         {...progressModalProps({
@@ -1011,6 +964,30 @@ export default function ZaitanDetail() {
           message.success('转签约成功！项目已进入签约阶段')
           setZhuanQianyueVisible(false)
           setTimeout(() => navigate('/project/qianyue'), 800)
+        }}
+      />
+
+      {/* 移交至园区弹窗：成功后写入进展系统事件（消息/移交记录由弹窗内完成） */}
+      <TransferZaitanModal
+        key={`transfer-${transferVisible}`}
+        open={transferVisible}
+        projectData={project}
+        onCancel={() => setTransferVisible(false)}
+        onOk={() => {
+          const t = transferStore.getTransferByProject(project.key)
+          if (t) {
+            setProgressList(prev => [
+              {
+                id: `sys-transfer-${Date.now()}`,
+                type: PROGRESS_TYPE.SYSTEM,
+                content: `项目已移交至「${t.toDeptName}」` + (t.reason ? `，移交说明：${t.reason}` : ''),
+                reporter: t.by,
+                updateTime: t.time,
+              },
+              ...prev,
+            ])
+          }
+          setTransferVisible(false)
         }}
       />
 

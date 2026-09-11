@@ -24,3 +24,6 @@ Thumbs.db
 
 # Deploy script temp
 deploy.sh
+
+# Version backup snapshots
+/demo备份_*.zip

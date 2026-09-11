@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Table,
+  Tag,
   Button,
   Input,
   InputNumber,
@@ -21,7 +22,6 @@ import {
   SearchOutlined,
   ExportOutlined,
   ReloadOutlined,
-  PlusOutlined,
   SettingOutlined,
   MoreOutlined,
   UpOutlined,
@@ -30,8 +30,8 @@ import {
   EditOutlined,
   FileTextOutlined,
   PauseCircleOutlined,
-  ImportOutlined,
   SendOutlined,
+  SwapOutlined,
   ExclamationCircleOutlined,
 } from '@ant-design/icons'
 import mockData from '../mock/data.json'
@@ -39,27 +39,36 @@ import UpdateDecisionModal from '../components/UpdateDecisionModal'
 import ZaitanEditModal from '../components/ZaitanEditModal'
 import AssignModal from '../components/AssignModal'
 import ZhuanQianyueModal from '../components/ZhuanQianyueModal'
-import ImportModal from '../components/ImportModal'
-import { useViewRole, msgStore, useImported } from '../store/viewStore'
+import TransferZaitanModal from '../components/TransferZaitanModal'
+import { RESPONSIBLE_UNIT_SELECT_GROUPS, RESPONSIBLE_UNIT_OPTIONS, normalizeResponsibleUnits, DISTRICT_CODE_SEEDS } from '../constants/projectEnums'
+import { useViewRole, msgStore, transferStore, useTransferStore } from '../store/viewStore'
 
 const { RangePicker } = DatePicker
 
 // 所有列定义（带key用于列管理）
 const ALL_COLUMNS = [
   { key: 'index', title: '序号', dataIndex: 'index', width: 55, align: 'center', fixed: 'left', required: true },
+  { key: 'districtProjectCode', title: '区级项目编码', dataIndex: 'districtProjectCode', width: 130, align: 'center' },
   { key: 'reporter', title: '申报人', dataIndex: 'reporter', width: 130, align: 'left', fixed: 'left', ellipsis: true },
   { key: 'projectName', title: '项目名称', dataIndex: 'projectName', width: 220, ellipsis: true, required: true },
+  { key: 'projectCategory', title: '项目分类', dataIndex: 'projectCategory', width: 85, align: 'center' },
+  { key: 'needInvestAmount', title: '需投资金额(亿元)', dataIndex: 'needInvestAmount', width: 130, align: 'right' },
   { key: 'sourceArea', title: '来源地', dataIndex: 'sourceArea', width: 100, ellipsis: true },
-  { key: 'chushangType', title: '楚商类型', dataIndex: 'chushangType', width: 90, align: 'center' },
-  { key: 'chushangInfo', title: '楚商基本信息', dataIndex: 'chushangInfo', width: 110, align: 'center' },
   { key: 'domesticForeign', title: '内外资', dataIndex: 'domesticForeign', width: 70, align: 'center' },
   { key: 'industryCategory', title: '产业类别', dataIndex: 'industryCategory', width: 80, align: 'center' },
-  { key: 'projectCategory', title: '项目分类', dataIndex: 'projectCategory', width: 85, align: 'center' },
   { key: 'industryType', title: '行业类别', dataIndex: 'industryType', width: 160, ellipsis: true },
-  { key: 'projectDesc', title: '项目简介', dataIndex: 'projectDesc', width: 260, ellipsis: true },
+  { key: 'secondaryIndustryCategory', title: '次要行业类别', dataIndex: 'secondaryIndustryCategory', width: 140, ellipsis: true },
   { key: 'investorEntity', title: '投资主体', dataIndex: 'investorEntity', width: 180, ellipsis: true },
-  { key: 'investAmount', title: '投资金额(亿元)', dataIndex: 'investAmount', width: 130, align: 'right', sorter: true },
-  { key: 'enterpriseNature', title: '企业性质', dataIndex: 'enterpriseNature', width: 80, align: 'center' },
+  { key: 'dockingDate', title: '对接时间', dataIndex: 'dockingDate', width: 105, align: 'center' },
+  { key: 'investAmount', title: '计划投资总额(亿元)', dataIndex: 'investAmount', width: 145, align: 'right', sorter: true },
+  { key: 'responsibleUnits', title: '责任单位', dataIndex: 'responsibleUnits', width: 200, ellipsis: true },
+  { key: 'enterpriseCategory', title: '企业类别', dataIndex: 'enterpriseCategory', width: 150, ellipsis: true },
+  { key: 'isStock', title: '是否存量企业', dataIndex: 'isStock', width: 100, align: 'center' },
+  { key: 'registeredCapitalAmount', title: '注册资本(亿元)', dataIndex: 'registeredCapitalAmount', width: 120, align: 'right' },
+  { key: 'isEnclave', title: '是否飞地园区', dataIndex: 'isEnclave', width: 100, align: 'center' },
+  { key: 'isOverflow', title: '是否产业外溢', dataIndex: 'isOverflow', width: 100, align: 'center' },
+  { key: 'chushangType', title: '楚商类型', dataIndex: 'chushangType', width: 110, align: 'center' },
+  { key: 'projectDesc', title: '项目简介', dataIndex: 'projectDesc', width: 260, ellipsis: true },
   { key: 'reportTime', title: '申报时间', dataIndex: 'reportTime', width: 110, align: 'center' },
   { key: 'action', title: '操作', dataIndex: 'action', width: 180, fixed: 'right', align: 'center', required: true },
 ]
@@ -67,23 +76,45 @@ const ALL_COLUMNS = [
 // 默认显示的列
 const DEFAULT_VISIBLE_KEYS = ALL_COLUMNS.map(c => c.key)
 
+// 责任单位 Tag 展示：空显示 '-'，最多显示 3 个，超出 +N
+const unitTagStyle = { color: '#1677ff', background: '#e6f4ff', borderColor: '#91caff' }
+const renderUnits = (v) => {
+  const units = normalizeResponsibleUnits(v)
+  if (units.length === 0) return <span style={{ color: '#bfbfbf' }}>-</span>
+  const shown = units.slice(0, 3)
+  return (
+    <>
+      {shown.map(u => <Tag key={u} style={unitTagStyle}>{u}</Tag>)}
+      {units.length > 3 && <Tag style={unitTagStyle}>+{units.length - shown.length}</Tag>}
+    </>
+  )
+}
+
 export default function Zaitan() {
   const navigate = useNavigate()
   const { role, isSponsor, myDeptKey } = useViewRole()
+  // 订阅移交记录变化（移交后菜单/列表同步刷新）
+  useTransferStore()
 
-  // 接收方视角下，分派给当前单位的项目id mock（对应详情页中a-kcj/a-qfj/a-wljs等的项目是id=1）
-  // 简化：所有mock接收方都能看到id=1这个项目
-  const ASSIGNED_PROJECT_IDS = isSponsor ? null : new Set(['1'])
+  // 接收方视角下可见项目：分派给我的 ∪ 移交给我的（sponsor 为 null 表示全量）
+  const allowedProjectIds = (() => {
+    if (isSponsor) return null
+    const ids = new Set(['1'])
+    transferStore.getTransfersByDept(myDeptKey).forEach(t => ids.add(String(t.projectId)))
+    return ids
+  })()
   const [filters, setFilters] = useState({
     projectName: '',
     industryType: undefined,
     category: undefined,
     chushangType: undefined,
     domesticForeign: undefined,
+    projectCategory: undefined,
     minAmount: undefined,
     maxAmount: undefined,
     dateRange: null,
-    enterpriseNature: undefined,
+    responsibleUnits: undefined,
+    isOverflow: undefined,
   })
   const [selectedRowKeys, setSelectedRowKeys] = useState([])
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10 })
@@ -100,66 +131,68 @@ export default function Zaitan() {
   const [editModalVisible, setEditModalVisible] = useState(false)
   const [assignModalVisible, setAssignModalVisible] = useState(false)
   const [zhuanQianyueVisible, setZhuanQianyueVisible] = useState(false)
-  const [importVisible, setImportVisible] = useState(false)
+  const [transferVisible, setTransferVisible] = useState(false)
   const [tuikuVisible, setTuikuVisible] = useState(false)
   const [tuikuReason, setTuikuReason] = useState('')
-  const imported = useImported()
 
   const data = useMemo(() => {
-    // Excel导入成功的项目置顶展示
-    const raw = [
-      ...(imported?.stage === 'zaitan' ? imported.successProjects : []),
-      ...mockData.zaitan,
-    ]
-    return raw.map((item, idx) => ({
-      key: item.id,
-      index: idx + 1,
-      reporter: item['申报人'] || '-',
-      projectStatus: item['项目状态'] || '在谈',
-      projectName: item['项目名称'] || '-',
-      sourceArea: item['来源地'] || '-',
-      chushangType: item['楚商类型'] || '-',
-      chushangInfo: '-',
-      domesticForeign: item['内外资'] || '-',
-      industryCategory: item['产业类别'] || '-',
-      industryType: item['行业类别'] || '-',
-      projectDesc: item['项目简介'] || '-',
-      investorEntity: item['投资主体'] || '-',
-      investorContact: item['投资主体联系人'] || '-',
-      investAmount: item['投资金额（亿元）'] || 0,
-      enterpriseNature: item['企业性质'] || '-',
-      enterpriseCategory: item['企业类别'] || '-',
-      assignedLevel: item['交办层级'] || '-',
-      cityContact: item['市投促局联络人'] || '-',
-      districtLeader: item['区级责任领导'] || '-',
-      districtContact: item['区投促局责任人'] || '-',
-      problemType: item['问题类型'] || '-',
-      warnStatus: item['预警状态'] || '-',
-      reportTime: item['申报时间'] || '-',
-      auditStatus: item['审核状态'] || '-',
-      isEnclave: item['是否飞地园区'] || '否',
-      isAdvancedMfg: item['是否先进制造业'] || '否',
-      chain965: item['对应"965"产业链类别'] || '-',
-      acceptArea: item['承接区'] || '-',
-      projectCategory: ['政策类', '投资类', '供地类', '其他'][idx % 4],
-    }))
-  }, [imported])
+    return mockData.zaitan.map((item, idx) => {
+      const projectCategory = ['政策类', '投资类', '供地类', '其他'][idx % 4]
+      return {
+        key: item.id,
+        index: idx + 1,
+        districtProjectCode: item['区级项目编码'] || DISTRICT_CODE_SEEDS[idx % DISTRICT_CODE_SEEDS.length],
+        reporter: item['申报人'] || '-',
+        projectStatus: item['项目状态'] || '在谈',
+        projectName: item['项目名称'] || '-',
+        sourceArea: item['来源地'] || '-',
+        domesticForeign: item['内外资'] || '-',
+        industryCategory: item['产业类别'] || '-',
+        industryType: item['行业类别'] || '-',
+        projectDesc: item['项目简介'] || '-',
+        investorEntity: item['投资主体'] || '-',
+        investAmount: item['投资金额（亿元）'] || 0,
+        reportTime: item['申报时间'] || '-',
+        isEnclave: item['是否飞地园区'] || '否',
+        isOverflow: item['是否产业外溢'] || (idx % 2 === 0 ? '是' : '否'),
+        // ===== 在谈字段（存量行按行号轮转补种子，保证演示有值）=====
+        projectCategory,
+        // 需投资金额：仅投资类项目有值
+        needInvestAmount: projectCategory === '投资类' ? [1.2, 2.5, 0.8, 3.2][idx % 4] : undefined,
+        secondaryIndustryCategory: ['生物医药', '智能机器人', '先进半导体', '高端医疗器械'][idx % 4],
+        dockingDate: item['对接时间'] || ['2026-05-08', '2026-05-12', '2026-04-20', '2026-05-06'][idx % 4],
+        enterpriseCategory: item['企业类别'] || ['国家级高新技术企业', '国家级专精特新', '中国500强', '金种子'][idx % 4],
+        isStock: '否',
+        registeredCapitalAmount: item['注册资本'] || [0.1, 0.5, 0.08, 0.2][idx % 4],
+        chushangType: item['楚商类型'] || ['湖北籍企业家', '武汉校友', '非楚商', '泛楚商'][idx % 4],
+        // 存量行无责任单位时给默认种子，保证演示展示有值
+        responsibleUnits: normalizeResponsibleUnits(item['责任单位']).length
+          ? normalizeResponsibleUnits(item['责任单位'])
+          : [RESPONSIBLE_UNIT_OPTIONS[idx % RESPONSIBLE_UNIT_OPTIONS.length]],
+      }
+    })
+  }, [])
 
   const filteredData = useMemo(() => {
     return data.filter(r => {
       // 接收方视角：只展示分派给自己的项目
-      if (ASSIGNED_PROJECT_IDS && !ASSIGNED_PROJECT_IDS.has(String(r.key))) return false
+      if (allowedProjectIds && !allowedProjectIds.has(String(r.key))) return false
       if (filters.projectName && !r.projectName.includes(filters.projectName)) return false
       if (filters.industryType && r.industryType !== filters.industryType) return false
       if (filters.category && r.industryCategory !== filters.category) return false
       if (filters.domesticForeign && r.domesticForeign !== filters.domesticForeign) return false
-      if (filters.enterpriseNature && r.enterpriseNature !== filters.enterpriseNature) return false
+      if (filters.projectCategory && r.projectCategory !== filters.projectCategory) return false
+      if (filters.isOverflow && r.isOverflow !== filters.isOverflow) return false
+      if (Array.isArray(filters.responsibleUnits) && filters.responsibleUnits.length > 0) {
+        const units = r.responsibleUnits || []
+        if (!filters.responsibleUnits.some(u => units.includes(u))) return false
+      }
       const amt = Number(r.investAmount) || 0
       if (filters.minAmount !== undefined && filters.minAmount !== '' && amt < Number(filters.minAmount)) return false
       if (filters.maxAmount !== undefined && filters.maxAmount !== '' && amt > Number(filters.maxAmount)) return false
       return true
     })
-  }, [data, filters, ASSIGNED_PROJECT_IDS])
+  }, [data, filters, allowedProjectIds])
 
   // 分页数据
   const pageData = useMemo(() => {
@@ -182,8 +215,9 @@ export default function Zaitan() {
   const handleReset = () => {
     setFilters({
       projectName: '', industryType: undefined, category: undefined,
-      chushangType: undefined, domesticForeign: undefined,
-      minAmount: undefined, maxAmount: undefined, dateRange: null, enterpriseNature: undefined,
+      chushangType: undefined, domesticForeign: undefined, projectCategory: undefined,
+      minAmount: undefined, maxAmount: undefined, dateRange: null,
+      responsibleUnits: undefined, isOverflow: undefined,
     })
   }
 
@@ -206,6 +240,10 @@ export default function Zaitan() {
       { key: 'edit', icon: <EditOutlined />, label: '编辑' },
       { key: 'assign', icon: <SendOutlined />, label: '分派' },
     ]
+    // 移交：仅发起方、且该项目未移交过（仅支持一次）
+    if (!transferStore.hasTransferred(record.key)) {
+      items.push({ key: 'transfer', icon: <SwapOutlined />, label: '移交' })
+    }
     if (canUpdateDecision(record)) {
       items.push({ key: 'decision', icon: <SettingOutlined />, label: '更新决策节点' })
     }
@@ -229,6 +267,8 @@ export default function Zaitan() {
       setEditModalVisible(true)
     } else if (e.key === 'assign') {
       setAssignModalVisible(true)
+    } else if (e.key === 'transfer') {
+      setTransferVisible(true)
     }
   }
 
@@ -293,16 +333,27 @@ export default function Zaitan() {
       )
     }
     if (col.dataIndex === 'chushangType') {
-      return v === '-' || v === '' ? <span style={{ color: '#bfbfbf' }}>-</span> : v
-    }
-    if (col.dataIndex === 'chushangInfo') {
-      return <span style={{ color: '#bfbfbf' }}>-</span>
+      return v === '-' || v === '' || v === undefined ? <span style={{ color: '#bfbfbf' }}>-</span> : v
     }
     if (col.dataIndex === 'projectDesc') {
       return <Tooltip title={v} placement="topLeft" overlayStyle={{ maxWidth: 480 }}><span>{v}</span></Tooltip>
     }
     if (col.dataIndex === 'investAmount') {
       return <span style={{ fontWeight: 600 }}>{Number(v).toFixed(2)}</span>
+    }
+    if (col.dataIndex === 'needInvestAmount') {
+      // 需投资金额：非投资类项目无值显示 '-'
+      return v === undefined || v === null || v === ''
+        ? <span style={{ color: '#bfbfbf' }}>-</span>
+        : <span style={{ fontWeight: 600 }}>{Number(v).toFixed(2)}</span>
+    }
+    if (col.dataIndex === 'registeredCapitalAmount') {
+      return v === undefined || v === null || v === ''
+        ? <span style={{ color: '#bfbfbf' }}>-</span>
+        : Number(v).toFixed(2)
+    }
+    if (col.dataIndex === 'responsibleUnits') {
+      return renderUnits(v)
     }
     if (col.dataIndex === 'action') {
       return (
@@ -395,6 +446,9 @@ export default function Zaitan() {
             onChange={(e) => setFilters({ ...filters, projectName: e.target.value })}
             allowClear
           />
+          <Select placeholder="项目分类" {...selectCommon} style={{ width: fw }}
+            value={filters.projectCategory} onChange={(v) => setFilters({ ...filters, projectCategory: v })}
+            options={['政策类', '投资类', '供地类', '其他'].map(v => ({ label: v, value: v }))} />
           <Select placeholder="产业类别" {...selectCommon} style={{ width: fw }}
             value={filters.category} onChange={(v) => setFilters({ ...filters, category: v })}
             options={industryCategoryOptions} />
@@ -412,6 +466,17 @@ export default function Zaitan() {
           </div>
           <RangePicker style={{ width: 260 }} value={filters.dateRange}
             onChange={(v) => setFilters({ ...filters, dateRange: v })} />
+          <Select
+            mode="multiple"
+            placeholder="责任单位"
+            style={{ width: 220 }}
+            value={filters.responsibleUnits}
+            onChange={(v) => setFilters({ ...filters, responsibleUnits: v })}
+            options={RESPONSIBLE_UNIT_SELECT_GROUPS}
+            allowClear
+            showSearch
+            maxTagCount="responsive"
+          />
           <div style={{ flex: 1, textAlign: 'right' }}>
             <Button
               type="link"
@@ -428,22 +493,13 @@ export default function Zaitan() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
             <Select placeholder="楚商类型" {...selectCommon} style={{ width: fw }}
               value={filters.chushangType} onChange={(v) => setFilters({ ...filters, chushangType: v })}
-              options={[
-                { label: '湖北籍企业家', value: 'hubei' },
-                { label: '武汉校友', value: 'wh_alumni' },
-                { label: '非楚商', value: 'none' },
-              ]} />
+              options={['湖北籍企业家', '武汉校友', '非楚商', '泛楚商'].map(v => ({ label: v, value: v }))} />
             <Select placeholder="内外资" {...selectCommon} style={{ width: fw }}
               value={filters.domesticForeign} onChange={(v) => setFilters({ ...filters, domesticForeign: v })}
               options={[{ label: '内资', value: '内资' }, { label: '外资', value: '外资' }]} />
-            <Select placeholder="企业性质" {...selectCommon} style={{ width: fw }}
-              value={filters.enterpriseNature} onChange={(v) => setFilters({ ...filters, enterpriseNature: v })}
-              options={[
-                { label: '国企（央企）', value: '国企（央企）' },
-                { label: '国企（地方）', value: '国企（地方）' },
-                { label: '民企', value: '民企' },
-                { label: '外企', value: '外企' },
-              ]} />
+            <Select placeholder="是否产业外溢" {...selectCommon} style={{ width: fw }}
+              value={filters.isOverflow} onChange={(v) => setFilters({ ...filters, isOverflow: v })}
+              options={[{ label: '是', value: '是' }, { label: '否', value: '否' }]} />
           </div>
         )}
 
@@ -477,7 +533,6 @@ export default function Zaitan() {
             )}
           </div>
           <Space size={8}>
-            <Button icon={<ImportOutlined />} onClick={() => setImportVisible(true)}>导入</Button>
             <Tooltip title="搜索">
               <Button type="text" icon={<SearchOutlined />} />
             </Tooltip>
@@ -503,7 +558,7 @@ export default function Zaitan() {
           columns={columns}
           dataSource={pageData}
           rowKey="key"
-          scroll={{ x: 2200 }}
+          scroll={{ x: 3540 }}
           sticky={{ offsetHeader: 0 }}
           size="middle"
           rowSelection={{
@@ -575,6 +630,15 @@ export default function Zaitan() {
         onOk={handleAssignOk}
       />
 
+      {/* 列表页弹窗：移交至园区 */}
+      <TransferZaitanModal
+        key={`list-transfer-${transferVisible}`}
+        open={transferVisible}
+        projectData={currentProject}
+        onCancel={() => { setTransferVisible(false); setCurrentProject(null) }}
+        onOk={() => { setTransferVisible(false); setCurrentProject(null) }}
+      />
+
       {/* 列表页弹窗：转签约 */}
       <ZhuanQianyueModal
         key={`list-zhuanqianyue-${zhuanQianyueVisible}`}
@@ -586,14 +650,6 @@ export default function Zaitan() {
           setZhuanQianyueVisible(false)
           setCurrentProject(null)
         }}
-      />
-
-      {/* 列表页弹窗：导入（含判重检测） */}
-      <ImportModal
-        open={importVisible}
-        stage="zaitan"
-        stageLabel="在谈"
-        onCancel={() => setImportVisible(false)}
       />
 
       {/* 列表页弹窗：退库确认 */}

@@ -1,17 +1,15 @@
-import { useEffect, useState } from 'react'
-import { Modal, Form, Row, Col, Input, InputNumber, Select, Cascader, DatePicker, Radio, Upload, message } from 'antd'
-import { PlusOutlined } from '@ant-design/icons'
+import { useEffect, useRef, useState } from 'react'
+import { Modal, Form, Row, Col, Input, InputNumber, Select, Cascader, DatePicker, Radio, message, Alert, Button, Tag } from 'antd'
 import {
   PROJECT_CATEGORY_OPTIONS, CAPITAL_NATURE_OPTIONS, INDUSTRY_TYPE_OPTIONS,
-  ENTERPRISE_NATURE_OPTIONS, ENTERPRISE_CATEGORY_OPTIONS, STOCK_ENTERPRISE_TYPE_OPTIONS,
-  WUGU_OPTIONS, BELONG_AREA_OPTIONS, CONSTRUCTION_NATURE_OPTIONS,
-  MERCHANT_TYPE_OPTIONS, ASSIGNED_LEVEL_OPTIONS, CHUSHANG_TYPE_OPTIONS,
-  OVERFLOW_SOURCE_OPTIONS, INDUSTRY_CASCADER_OPTIONS, CHAIN_965_CASCADER_OPTIONS,
-  DOMESTIC_REGION_OPTIONS, FOREIGN_COUNTRY_OPTIONS,
+  ENTERPRISE_CATEGORY_OPTIONS, CHUSHANG_TYPE_OPTIONS,
+  INDUSTRY_CASCADER_OPTIONS, DOMESTIC_REGION_OPTIONS, FOREIGN_COUNTRY_OPTIONS,
+  RESPONSIBLE_UNIT_SELECT_GROUPS, normalizeResponsibleUnits,
 } from '../constants/projectEnums'
+import DuplicateWarningModal from './DuplicateWarningModal'
+import { checkDuplicates, buildZaitanLib } from '../utils/duplicateCheck'
 
 const { TextArea } = Input
-const { YearPicker } = DatePicker
 
 const SectionHeader = ({ title }) => (
   <div style={{
@@ -27,60 +25,111 @@ const SectionHeader = ({ title }) => (
 
 export default function TransferToZaitanModal({ open, onCancel, onOk, projectData }) {
   const [form] = Form.useForm()
-  const [fileList, setFileList] = useState([])
+  // ===== 实时判重（PRD 2.1.8 场景一：转在谈补判重，比对在谈库）=====
+  const [warnVisible, setWarnVisible] = useState(false)
+  const [warnHits, setWarnHits] = useState([])
+  const [warnValues, setWarnValues] = useState(null)
+  const [l4Hits, setL4Hits] = useState([])
+  const [l4Expanded, setL4Expanded] = useState(false)
+  const l4AckRef = useRef(false) // L4 提示后放行：再次提交直接保存
 
-  const watchedCategory = Form.useWatch('projectCategory', form)
-  const watchedInvestAmount = Form.useWatch('investAmount', form)
   const watchedCapitalNature = Form.useWatch('capitalNature', form)
+  const watchedCategory = Form.useWatch('projectCategory', form)
 
   useEffect(() => {
     if (open && projectData) {
       form.resetFields()
-      setFileList([])
+      setL4Hits([])
+      setL4Expanded(false)
+      l4AckRef.current = false
       const fv = projectData._formValues || {}
       const initialValues = {
+        // 谋划阶段带出
+        districtProjectCode: projectData.districtProjectCode,
         projectName: projectData.projectName,
-        natongProjectName: undefined,
-        natongInvestAmount: 0,
-        projectCategory: projectData.projectCategory,
         capitalNature: fv.capitalNature,
         sourceRegion: fv.sourceRegion,
         industryType: fv.industryType || (projectData.industryCategory !== '-' ? projectData.industryCategory : undefined),
         industryCategory: fv.industryCategory,
-        secondaryIndustryCategory: undefined,
-        chainType965: fv.chainType965,
-        secondaryChain965: undefined,
-        investorEntity: projectData.investorEntity !== '-' ? projectData.investorEntity : undefined,
-        investorContactPerson: fv.investorContactPerson,
-        investorContactPhone: fv.investorContactPhone,
-        investAmount: fv.investAmount || projectData.investAmount,
         projectDescription: fv.projectDescription || (projectData.projectDesc && projectData.projectDesc !== '-' ? projectData.projectDesc : undefined),
-        isStock: '否',
-        isOverflow: '否',
-        isEvaluated: '是',
-        isEnclave: '否',
-        isRdCenter: '否',
-        isAdvancedMfg: '否',
-        assignedLevel: '非领导交办',
-        merchantType: '其它',
+        investAmount: fv.investAmount || projectData.investAmount,
+        responsibleUnits: normalizeResponsibleUnits(projectData.responsibleUnits),
+        // 在谈阶段待填
+        projectCategory: undefined,
+        needInvestAmount: undefined,
+        secondaryIndustryCategory: undefined,
+        investorEntity: projectData.investorEntity !== '-' ? projectData.investorEntity : undefined,
         dockingDate: null,
+        enterpriseCategory: undefined,
+        isStock: '否',
+        registeredCapitalAmount: undefined,
+        isEnclave: '否',
+        isOverflow: undefined,
+        chushangType: undefined,
       }
       form.setFieldsValue(initialValues)
     }
   }, [open, form, projectData])
 
+  // 执行转在谈（判重通过 / L4 放行 / 预警「仍要提交」后调用）
+  const doTransfer = (values) => {
+    message.success('已转在谈（demo示意）')
+    setL4Hits([])
+    setL4Expanded(false)
+    l4AckRef.current = false
+    onOk?.(values)
+  }
+
   const handleOk = async () => {
     try {
       const values = await form.validateFields()
-      if (fileList.length > 10) {
-        message.warning('上传附件数量不能超过10个')
+      // ===== 实时判重：转在谈为字段补齐后的补判重最后时机，仅比对在谈库，不进入研判池 =====
+      const now = new Date()
+      const pad = (n) => String(n).padStart(2, '0')
+      const hits = checkDuplicates({
+        projectName: values.projectName,
+        investorEntity: values.investorEntity,
+        investAmount: values.investAmount,
+        industryCategory: values.industryType || '',
+        industryType: values.industryCategory ? values.industryCategory.join(' / ') : '',
+        reporter: '投促局管理员',
+        reportTime: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+      }, [
+        { stage: '在谈', rows: buildZaitanLib() },
+      ])
+      const strongHits = hits.filter(h => h.level !== 'L4')
+      const l4Only = hits.filter(h => h.level === 'L4')
+      if (strongHits.length > 0) {
+        setWarnValues(values)
+        setWarnHits(hits)
+        setWarnVisible(true)
         return
       }
-      message.success('已转在谈（demo示意）')
-      onOk?.({ ...values, attachments: fileList })
+      if (l4Only.length > 0 && !l4AckRef.current) {
+        l4AckRef.current = true
+        setL4Hits(l4Only)
+        setL4Expanded(false)
+        message.warning('检测到与库中项目存在弱相似信号，建议核实是否重复；确认无误可再次提交')
+        return
+      }
+      doTransfer(values)
     } catch (e) {
       // validation error
     }
+  }
+
+  const handleWarnReturn = () => {
+    setWarnVisible(false)
+    setWarnHits([])
+    setWarnValues(null)
+  }
+
+  const handleWarnForce = () => {
+    setWarnVisible(false)
+    setWarnHits([])
+    const values = warnValues
+    setWarnValues(null)
+    if (values) doTransfer(values)
   }
 
   const formItemLayout = { labelCol: { span: 9 }, wrapperCol: { span: 15 } }
@@ -95,64 +144,83 @@ export default function TransferToZaitanModal({ open, onCancel, onOk, projectDat
     ? FOREIGN_COUNTRY_OPTIONS.map(v => ({ label: v, value: v }))
     : watchedCapitalNature === '内资' ? DOMESTIC_REGION_OPTIONS : []
 
-  const uploadProps = {
-    fileList,
-    onChange: ({ fileList: newList }) => setFileList(newList.slice(0, 10)),
-    beforeUpload: (file) => {
-      const allowedExt = /\.(doc|docx|pdf|xls|xlsx|ppt|pptx|jpg|jpeg|png)$/i
-      const isAllowedType = allowedExt.test(file.name)
-      const isLt50M = file.size / 1024 / 1024 < 50
-      if (!isAllowedType) {
-        message.error('仅支持 word、pdf、excel、ppt、jpg、png 格式文件')
-        return Upload.LIST_IGNORE
-      }
-      if (!isLt50M) {
-        message.error('文件大小不能超过50MB')
-        return Upload.LIST_IGNORE
-      }
-      return false
-    },
-    multiple: true,
-  }
-
   return (
-    <Modal
-      title="转在谈"
-      open={open}
-      onOk={handleOk}
-      onCancel={onCancel}
-      okText="确认转在谈"
-      cancelText="取消"
-      width={1100}
-      destroyOnClose
-      styles={{ body: { maxHeight: '70vh', overflowY: 'auto', padding: '16px 24px 8px' } }}
-    >
-      <Form form={form} layout="horizontal" colon={false} requiredMark={true} {...formItemLayout}>
+    <>
+      <Modal
+        title="转在谈"
+        open={open}
+        onOk={handleOk}
+        onCancel={onCancel}
+        okText="确认转在谈"
+        cancelText="取消"
+        width={1100}
+        destroyOnClose
+        styles={{ body: { maxHeight: '70vh', overflowY: 'auto', padding: '16px 24px 8px' } }}
+      >
+        <Form form={form} layout="horizontal" colon={false} requiredMark={true} {...formItemLayout}>
+          {/* L4 弱提示：不阻断，可展开冲突项目列表（名称/阶段/链接） */}
+          {l4Hits.length > 0 && (
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message="检测到与库中项目存在弱相似信号，建议核实是否重复"
+              action={
+                <Button type="link" size="small" onClick={() => setL4Expanded(!l4Expanded)}>
+                  {l4Expanded ? '收起' : '展开冲突项目'}
+                </Button>
+              }
+              description={l4Expanded ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {l4Hits.map((h, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Tag bordered={false}>{h.target.stageLabel}</Tag>
+                      <span style={{ fontWeight: 500 }}>{h.target.projectName}</span>
+                      <span style={{ color: '#8c8c8c', fontSize: 12 }}>{h.reason}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : undefined}
+            />
+          )}
 
-        {/* 第一组：项目基本信息 */}
-        <SectionHeader title="项目基本信息" />
+          <SectionHeader title="项目基本信息" />
         <Row gutter={24}>
+          <Col {...colProps}>
+            <Form.Item label="区级项目编码" name="districtProjectCode">
+              <Input disabled placeholder="系统自动生成" />
+            </Form.Item>
+          </Col>
           <Col {...colProps}>
             <Form.Item label="项目名称" name="projectName" rules={[{ required: true, message: '请输入项目名称' }, { max: 40, message: '不超过40字' }]}>
               <Input placeholder="请输入项目名称" maxLength={40} />
             </Form.Item>
           </Col>
           <Col {...colProps}>
-            <Form.Item label="纳统项目名称" name="natongProjectName">
-              <Input placeholder="统计部门入库纳统名称" maxLength={100} />
+            <Form.Item label="项目分类" name="projectCategory" rules={[{ required: true, message: '请选择项目分类' }]}>
+              <Select
+                placeholder="请选择"
+                options={PROJECT_CATEGORY_OPTIONS.map(v => ({ label: v, value: v }))}
+                onChange={(v) => {
+                  // 切换为非投资类时清空需投资金额，避免残留
+                  if (v !== '投资类') form.setFieldValue('needInvestAmount', undefined)
+                }}
+              />
             </Form.Item>
           </Col>
 
-          <Col {...colProps}>
-            <Form.Item label="纳统计划总投资额" name="natongInvestAmount">
-              <InputNumber style={{ width: '100%' }} placeholder="万元" min={0} precision={2} addonAfter="万元" />
-            </Form.Item>
-          </Col>
-          <Col {...colProps}>
-            <Form.Item label="项目分类" name="projectCategory" rules={[{ required: true, message: '请选择项目分类' }]}>
-              <Select placeholder="请选择" options={PROJECT_CATEGORY_OPTIONS.map(v => ({ label: v, value: v }))} />
-            </Form.Item>
-          </Col>
+          {/* 需投资金额：仅项目分类=投资类时出现，紧跟项目分类之后 */}
+          {watchedCategory === '投资类' && (
+            <Col {...colProps}>
+              <Form.Item label="需投资金额" name="needInvestAmount" rules={[
+                { required: true, message: '请输入需投资金额' },
+                { type: 'number', min: 0.01, message: '需投资金额需大于0' },
+              ]}>
+                <InputNumber style={{ width: '100%' }} placeholder="请输入" min={0} precision={2} addonAfter="亿元" />
+              </Form.Item>
+            </Col>
+          )}
+
           <Col {...colProps}>
             <Form.Item label="内外资" name="capitalNature" rules={[{ required: true, message: '请选择' }]}>
               <Select
@@ -192,313 +260,79 @@ export default function TransferToZaitanModal({ open, onCancel, onOk, projectDat
           </Col>
 
           <Col {...colProps}>
-            <Form.Item label="对应965产业链" name="chainType965" rules={[{ required: true, message: '请选择产业链' }]}>
-              <Cascader options={CHAIN_965_CASCADER_OPTIONS} placeholder="主链 / 子链" expandTrigger="hover" showSearch />
-            </Form.Item>
-          </Col>
-          <Col {...colProps}>
-            <Form.Item label="次要产业链类别" name="secondaryChain965">
-              <Cascader options={CHAIN_965_CASCADER_OPTIONS} placeholder="主链 / 子链（选填）" expandTrigger="hover" showSearch />
-            </Form.Item>
-          </Col>
-
-          <Col {...colProps}>
             <Form.Item label="投资主体" name="investorEntity" rules={[{ required: true, message: '请输入投资主体' }]}>
               <Input placeholder="请输入投资主体" />
             </Form.Item>
           </Col>
           <Col {...colProps}>
-            <Form.Item label="投资主体联系人" name="investorContactPerson" rules={[{ required: true, message: '请输入联系人' }]}>
-              <Input placeholder="请输入联系人" />
+            <Form.Item label="对接时间" name="dockingDate" rules={[{ required: true, message: '请选择对接时间' }]}>
+              <DatePicker style={{ width: '100%' }} placeholder="请选择对接时间" />
             </Form.Item>
           </Col>
 
-          <Col {...colProps}>
-            <Form.Item label="联系电话" name="investorContactPhone" rules={[
-              { required: true, message: '请输入电话' },
-              { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号' }
-            ]}>
-              <Input placeholder="11位手机号" maxLength={11} />
-            </Form.Item>
-          </Col>
           <Col {...colProps}>
             <Form.Item label="计划投资总额" name="investAmount" rules={[{ required: true, message: '请输入投资金额' }]}>
               <InputNumber style={{ width: '100%' }} placeholder="请输入" min={0} precision={2} addonAfter="亿元" />
             </Form.Item>
           </Col>
-
           <Col {...colProps}>
-            <Form.Item label="对接时间" name="dockingDate" rules={[{ required: true, message: '请选择对接时间' }]}>
-              <DatePicker style={{ width: '100%' }} placeholder="请选择对接时间" />
-            </Form.Item>
-          </Col>
-          <Col {...colProps}>
-            <Form.Item label="招商类型" name="merchantType" rules={[{ required: true, message: '请选择招商类型' }]}>
-              <Select placeholder="请选择" options={MERCHANT_TYPE_OPTIONS.map(v => ({ label: v, value: v }))} />
+            <Form.Item label="责任单位" name="responsibleUnits" rules={[{ required: true, message: '请选择责任单位（至少1个）' }]}>
+              <Select mode="multiple" options={RESPONSIBLE_UNIT_SELECT_GROUPS} placeholder="请选择责任单位" showSearch allowClear maxTagCount="responsive" />
             </Form.Item>
           </Col>
 
           <Col {...colProps}>
-            <Form.Item label="招商类型说明" name="merchantTypeDesc" rules={[{ required: true, message: '请输入说明' }, { max: 100, message: '不超过100字' }]}>
-              <Input placeholder="请输入说明" maxLength={100} />
+            <Form.Item label="企业类别" name="enterpriseCategory">
+              <Select placeholder="请选择" showSearch allowClear options={ENTERPRISE_CATEGORY_OPTIONS.map(v => ({ label: v, value: v }))} />
             </Form.Item>
           </Col>
+          <Col {...colProps}>
+            <Form.Item label="是否为存量企业" name="isStock" rules={[{ required: true, message: '请选择' }]}>
+              <Radio.Group options={radioOptions} />
+            </Form.Item>
+          </Col>
+
+          <Col {...colProps}>
+            <Form.Item label="注册资本" name="registeredCapitalAmount">
+              <InputNumber style={{ width: '100%' }} placeholder="金额（选填）" min={0} precision={2} addonAfter="亿元" />
+            </Form.Item>
+          </Col>
+          <Col {...colProps}>
+            <Form.Item label="是否飞地园区" name="isEnclave" rules={[{ required: true }]}>
+              <Radio.Group options={radioOptions} />
+            </Form.Item>
+          </Col>
+
+          <Col {...colProps}>
+            <Form.Item label="是否产业外溢" name="isOverflow" rules={[{ required: true, message: '请选择是否产业外溢' }]}>
+              <Radio.Group options={radioOptions} />
+            </Form.Item>
+          </Col>
+
+          <Col {...colProps}>
+            <Form.Item label="楚商类型" name="chushangType">
+              <Select placeholder="请选择" allowClear options={CHUSHANG_TYPE_OPTIONS.map(v => ({ label: v, value: v }))} />
+            </Form.Item>
+          </Col>
+
           <Col span={24}>
             <Form.Item label="项目简介" name="projectDescription" labelCol={{ span: 4 }} wrapperCol={{ span: 20 }} rules={[{ required: true, message: '请输入项目简介' }]}>
               <TextArea rows={3} placeholder="请输入项目简介" maxLength={999} showCount />
             </Form.Item>
           </Col>
         </Row>
-
-        {/* 第二组：项目分类指标信息 */}
-        <SectionHeader title="项目分类指标信息" />
-        <Row gutter={24}>
-          <Col {...colProps}>
-            <Form.Item label="所属五谷产业集群" name="wuguCluster" rules={[{ required: true, message: '请选择' }]}>
-              <Select placeholder="请选择" options={WUGU_OPTIONS.map(v => ({ label: v, value: v }))} />
-            </Form.Item>
-          </Col>
-          <Col {...colProps}>
-            <Form.Item label="所属片区" name="belongArea" rules={[{ required: true, message: '请选择所属片区' }]}>
-              <Select placeholder="请选择" options={BELONG_AREA_OPTIONS.map(v => ({ label: v, value: v }))} />
-            </Form.Item>
-          </Col>
-
-          <Col {...colProps}>
-            <Form.Item label="建设性质" name="constructionNature">
-              <Select placeholder="请选择" options={CONSTRUCTION_NATURE_OPTIONS.map(v => ({ label: v, value: v }))} />
-            </Form.Item>
-          </Col>
-          <Col {...colProps}>
-            <Form.Item label="企业性质" name="enterpriseNature" rules={[{ required: true, message: '请选择' }]}>
-              <Select placeholder="请选择" options={ENTERPRISE_NATURE_OPTIONS.map(v => ({ label: v, value: v }))} />
-            </Form.Item>
-          </Col>
-
-          <Col {...colProps}>
-            <Form.Item label="企业类别" name="enterpriseCategory" rules={[{ required: true, message: '请选择' }]}>
-              <Select placeholder="请选择" showSearch options={ENTERPRISE_CATEGORY_OPTIONS.map(v => ({ label: v, value: v }))} />
-            </Form.Item>
-          </Col>
-          <Col {...colProps}>
-            <Form.Item label="是否为存量企业" name="isStock" rules={[{ required: true, message: '请选择' }]}>
-              <Radio.Group
-                options={radioOptions}
-                onChange={(e) => {
-                  if (e.target.value === '否') {
-                    form.setFieldsValue({ stockType: undefined, stockTypeOther: undefined, firstInvestYear: undefined })
-                  }
-                }}
-              />
-            </Form.Item>
-          </Col>
-
-          <Form.Item noStyle shouldUpdate={(prev, cur) => prev.isStock !== cur.isStock}>
-            {({ getFieldValue }) => {
-              const val = getFieldValue('isStock')
-              return val === '是' ? (
-                <Col {...colProps}>
-                  <Form.Item label="存量企业类型" name="stockType" rules={[{ required: true, message: '请选择' }]}>
-                    <Select
-                      placeholder="请选择"
-                      options={STOCK_ENTERPRISE_TYPE_OPTIONS.map(v => ({ label: v, value: v }))}
-                      onChange={(v) => { if (v !== '其他') form.setFieldsValue({ stockTypeOther: undefined }) }}
-                    />
-                  </Form.Item>
-                </Col>
-              ) : null
-            }}
-          </Form.Item>
-
-          <Form.Item noStyle shouldUpdate={(prev, cur) => prev.isStock !== cur.isStock || prev.stockType !== cur.stockType}>
-            {({ getFieldValue }) => {
-              const val = getFieldValue('stockType')
-              const isStockVal = getFieldValue('isStock')
-              return isStockVal === '是' && val === '其他' ? (
-                <Col {...colProps}>
-                  <Form.Item label="存量类型-其他" name="stockTypeOther" rules={[{ required: true, message: '请输入说明' }]}>
-                    <Input placeholder="请输入说明" maxLength={100} />
-                  </Form.Item>
-                </Col>
-              ) : null
-            }}
-          </Form.Item>
-
-          <Form.Item noStyle shouldUpdate={(prev, cur) => prev.isStock !== cur.isStock}>
-            {({ getFieldValue }) => {
-              const val = getFieldValue('isStock')
-              return val === '是' ? (
-                <Col {...colProps}>
-                  <Form.Item label="首次投资年份" name="firstInvestYear" rules={[{ required: true, message: '请选择' }]}>
-                    <YearPicker style={{ width: '100%' }} placeholder="请选择年份" />
-                  </Form.Item>
-                </Col>
-              ) : null
-            }}
-          </Form.Item>
-
-          <Col {...colProps}>
-            <Form.Item label="成立日期" name="establishmentDate">
-              <DatePicker style={{ width: '100%' }} placeholder="请选择成立日期" />
-            </Form.Item>
-          </Col>
-          <Col {...colProps}>
-            <Form.Item label="注册资本" name="registeredCapitalAmount">
-              <InputNumber style={{ width: '100%' }} placeholder="金额" min={0} precision={2} addonAfter="亿元" />
-            </Form.Item>
-          </Col>
-
-          {/* 标记属性 Radio组 */}
-          <Col {...colProps}>
-            <Form.Item label="是否产业外溢" name="isOverflow">
-              <Radio.Group
-                options={radioOptions}
-                onChange={(e) => {
-                  if (e.target.value === '否') {
-                    form.setFieldsValue({ overflowSource: undefined })
-                  }
-                }}
-              />
-            </Form.Item>
-          </Col>
-          <Form.Item noStyle shouldUpdate={(prev, cur) => prev.isOverflow !== cur.isOverflow}>
-            {({ getFieldValue }) => {
-              const val = getFieldValue('isOverflow')
-              return val === '是' ? (
-                <Col {...colProps}>
-                  <Form.Item label="外溢来源" name="overflowSource" rules={[{ required: true, message: '请选择' }]}>
-                    <Select placeholder="请选择外溢来源" options={OVERFLOW_SOURCE_OPTIONS.map(v => ({ label: v, value: v }))} />
-                  </Form.Item>
-                </Col>
-              ) : <Col {...colProps} />
-            }}
-          </Form.Item>
-
-          <Col {...colProps}>
-            <Form.Item label="是否飞地园区" name="isEnclave" rules={[{ required: true }]}>
-              <Radio.Group options={radioOptions} />
-            </Form.Item>
-          </Col>
-          <Col {...colProps}>
-            <Form.Item label="是否研判" name="isEvaluated" rules={[{ required: true }]}>
-              <Radio.Group options={radioOptions} />
-            </Form.Item>
-          </Col>
-
-          <Col {...colProps}>
-            <Form.Item label="是否研发中心" name="isRdCenter" rules={[{ required: true }]}>
-              <Radio.Group options={radioOptions} />
-            </Form.Item>
-          </Col>
-          <Col {...colProps}>
-            <Form.Item label="是否先进制造业" name="isAdvancedMfg" rules={[{ required: true }]}>
-              <Radio.Group options={radioOptions} />
-            </Form.Item>
-          </Col>
-
-          {/* 楚商 */}
-          <Col {...colProps}>
-            <Form.Item label="楚商类型" name="chushangType">
-              <Select placeholder="请选择" options={CHUSHANG_TYPE_OPTIONS.map(v => ({ label: v, value: v }))} />
-            </Form.Item>
-          </Col>
-          <Col {...colProps}>
-            <Form.Item label="交办层级" name="assignedLevel">
-              <Select placeholder="请选择" options={ASSIGNED_LEVEL_OPTIONS.map(v => ({ label: v, value: v }))} />
-            </Form.Item>
-          </Col>
-        </Row>
-
-        <Row gutter={24}>
-          <Col span={24}>
-            <Form.Item label="楚商基本信息" name="chushangInfo" labelCol={{ span: 4 }} wrapperCol={{ span: 20 }}>
-              <TextArea rows={3} placeholder="请输入楚商基本信息" maxLength={500} showCount />
-            </Form.Item>
-          </Col>
-        </Row>
-
-        {/* 第三组：投资主体及负责单位信息 */}
-        <SectionHeader title="投资主体及负责单位信息" />
-        <Row gutter={24}>
-          <Col {...colProps}>
-            <Form.Item label="区级责任领导人" name="districtLeader">
-              <Input placeholder="请输入姓名" />
-            </Form.Item>
-          </Col>
-          <Col {...colProps}>
-            <Form.Item label="电话" name="districtLeaderPhone" rules={[
-              { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号' }
-            ]}>
-              <Input placeholder="11位手机号（选填）" maxLength={11} />
-            </Form.Item>
-          </Col>
-
-          <Col {...colProps}>
-            <Form.Item label="区投促局责任人" name="districtContact" rules={[{ required: true, message: '请输入' }]}>
-              <Input placeholder="请输入姓名" />
-            </Form.Item>
-          </Col>
-          <Col {...colProps}>
-            <Form.Item label="电话" name="districtContactPhone" rules={[
-              { required: true, message: '请输入电话' },
-              { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号' }
-            ]}>
-              <Input placeholder="11位手机号" maxLength={11} />
-            </Form.Item>
-          </Col>
-
-          <Col {...colProps}>
-            <Form.Item label="市投促局联络人" name="cityContact">
-              <Input placeholder="请输入姓名" />
-            </Form.Item>
-          </Col>
-          <Col {...colProps}>
-            <Form.Item label="电话" name="cityContactPhone" rules={[
-              { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号' }
-            ]}>
-              <Input placeholder="11位手机号（选填）" maxLength={11} />
-            </Form.Item>
-          </Col>
-
-          <Col {...colProps}>
-            <Form.Item label="报送联络人" name="reporterContact" rules={[{ required: true, message: '请输入' }]}>
-              <Input placeholder="请输入姓名" />
-            </Form.Item>
-          </Col>
-          <Col {...colProps}>
-            <Form.Item label="电话" name="reporterContactPhone" rules={[
-              { required: true, message: '请输入电话' },
-              { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号' }
-            ]}>
-              <Input placeholder="11位手机号" maxLength={11} />
-            </Form.Item>
-          </Col>
-
-          <Col {...colProps}>
-            <Form.Item label="电话核实情况" name="phoneVerify">
-              <Input placeholder="请输入核实情况" />
-            </Form.Item>
-          </Col>
-          <Col {...colProps}>
-            <Form.Item label="上传附件" labelCol={{ span: 9 }} wrapperCol={{ span: 15 }}>
-              <Upload {...uploadProps}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
-                  <button type="button" style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap',
-                    background: '#1677ff', color: '#fff', border: 'none', borderRadius: 4,
-                    padding: '5px 16px', cursor: 'pointer', fontSize: 13, lineHeight: 1.5,
-                  }}>
-                    <PlusOutlined /> 上传附件
-                  </button>
-                  <span style={{ fontSize: 12, color: '#999', lineHeight: 1.4 }}>
-                    可上传不超过50MB的word、pdf、excel、ppt、jpg、png等格式的文件
-                  </span>
-                </div>
-              </Upload>
-            </Form.Item>
-          </Col>
-        </Row>
       </Form>
-    </Modal>
+      </Modal>
+
+      {/* 实时判重预警弹窗（L1 阻断 / L2·L3 二选一） */}
+      <DuplicateWarningModal
+        open={warnVisible}
+        hits={warnHits}
+        contextTitle="转在谈"
+        onReturn={handleWarnReturn}
+        onForce={handleWarnForce}
+        onCloseAll={() => { setWarnVisible(false); onCancel?.() }}
+      />
+    </>
   )
 }

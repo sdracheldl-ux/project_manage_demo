@@ -78,7 +78,7 @@ export default function ImportModal({ open, stage, stageLabel, onCancel }) {
     msgStore.addMessage({
       toDeptKey: role.deptKey,
       title: '【导入判重提醒】',
-      content: `您导入的「${fileName || '项目清单'}」已处理完成：成功入库 ${res.summary.success} 条，疑似重复 ${res.summary.duplicate} 条已转入研判池（${levelText}），跳过 ${res.summary.skipped} 条。请及时前往"项目重复研判"处理重复项。`,
+      content: `您导入的「${fileName || '项目清单'}」已处理完成：成功入库 ${res.summary.success} 条，疑似重复 ${res.summary.duplicate} 条已转入研判池（${levelText}），跳过 ${res.summary.skipped} 条。请前往"项目重复研判"查看比对详情。`,
       type: 'import',
       link: '/project/yanpan',
     })
@@ -176,7 +176,7 @@ export default function ImportModal({ open, stage, stageLabel, onCancel }) {
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 8 }}>
             疑似重复明细
-            <span style={{ fontWeight: 400, color: '#8c8c8c', marginLeft: 8 }}>已转入研判池待人工决策，点击可直接前往处理</span>
+            <span style={{ fontWeight: 400, color: '#8c8c8c', marginLeft: 8 }}>已转入研判池待人工决策，点击可查看比对详情</span>
           </div>
           {conflicts.map(c => (
             <div

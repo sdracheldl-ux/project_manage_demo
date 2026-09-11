@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  Tabs, Descriptions, Button, Space, Tag, Modal, Form, Input, Select, Row, Col,
+  Tabs, Descriptions, Button, Space, Tag, Modal, Form, Input, InputNumber, Select, Cascader, Row, Col,
   message
 } from 'antd'
 import {
@@ -12,6 +12,11 @@ import mockData from '../mock/data.json'
 import TransferToZaitanModal from '../components/TransferToZaitanModal'
 import ProgressTimeline from '../components/ProgressTimeline'
 import ProgressSummaryModal from '../components/ProgressSummaryModal'
+import {
+  RESPONSIBLE_UNIT_SELECT_GROUPS, RESPONSIBLE_UNIT_OPTIONS, normalizeResponsibleUnits,
+  DOMESTIC_REGION_OPTIONS, FOREIGN_COUNTRY_OPTIONS, INDUSTRY_CASCADER_OPTIONS,
+  DISTRICT_CODE_SEEDS,
+} from '../constants/projectEnums'
 import {
   COLORS,
   sectionTitleStyle,
@@ -34,11 +39,33 @@ const INDUSTRY_TYPE_OPTIONS = ['农业', '工业', '服务业']
 
 const CURRENT_USER = '投促局管理员'
 
+const unitTagStyle = { background: '#e6f4ff', color: '#1677ff', border: '1px solid #91caff', borderRadius: 4, marginInlineEnd: 6 }
+
+// 责任单位渲染：空显示 '-'；每项浅蓝 Tag，最多 3 个，超出用 +N 收起
+function renderUnits(v) {
+  const list = normalizeResponsibleUnits(v)
+  if (list.length === 0) return '-'
+  const shown = list.slice(0, 3)
+  return (
+    <span>
+      {shown.map(u => <Tag key={u} style={unitTagStyle}>{u}</Tag>)}
+      {list.length > 3 && <Tag style={unitTagStyle}>+{list.length - 3}</Tag>}
+    </span>
+  )
+}
+
+// 计划投资总额(亿元)：空值显示 '-'
+function formatInvestAmount(v) {
+  if (v === undefined || v === null || v === '') return '-'
+  return Number(v).toFixed(2)
+}
+
 export default function MouhuaDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [basicForm] = Form.useForm()
   const [progressForm] = Form.useForm()
+  const editCapitalNature = Form.useWatch('capitalNature', basicForm)
 
   const [project, setProject] = useState(() => {
     const mockFormValues = [
@@ -50,6 +77,7 @@ export default function MouhuaDetail() {
     const base = mockData.zaitan.slice(0, 4).map((item, idx) => ({
       key: `mouhua-${idx + 1}`,
       index: idx + 1,
+      districtProjectCode: item['区级项目编码'] || DISTRICT_CODE_SEEDS[idx % DISTRICT_CODE_SEEDS.length],
       reporter: item['申报人'] || '-',
       projectStatus: '谋划中',
       projectName: item['项目名称'] || '-',
@@ -61,6 +89,8 @@ export default function MouhuaDetail() {
       investorContactPerson: mockFormValues[idx].investorContactPerson,
       investorContactPhone: mockFormValues[idx].investorContactPhone,
       investAmount: item['投资金额（亿元）'] || mockFormValues[idx].investAmount,
+      sourceRegion: mockFormValues[idx].sourceRegion,
+      responsibleUnits: [RESPONSIBLE_UNIT_OPTIONS[idx % RESPONSIBLE_UNIT_OPTIONS.length]],
       reportTime: item['申报时间'] || '-',
       projectCategory: PROJECT_CATEGORY_OPTIONS[idx % PROJECT_CATEGORY_OPTIONS.length],
       capitalNature: mockFormValues[idx].capitalNature,
@@ -111,15 +141,16 @@ export default function MouhuaDetail() {
   const handleBack = () => navigate('/project/mouhua')
 
   const handleEditBasic = () => {
+    const fv = project._formValues || {}
     basicForm.setFieldsValue({
       projectName: project.projectName,
-      projectCategory: project.projectCategory,
-      capitalNature: project.capitalNature,
+      capitalNature: project.capitalNature || fv.capitalNature,
+      sourceRegion: project.sourceRegion || fv.sourceRegion,
       industryType: project.industryCategory,
-      investorEntity: project.investorEntity,
-      investorContactPerson: project.investorContactPerson,
-      investorContactPhone: project.investorContactPhone,
-      projectDescription: project.projectDesc,
+      industryCategory: fv.industryCategory,
+      investAmount: project.investAmount != null && project.investAmount !== '' ? project.investAmount : fv.investAmount,
+      responsibleUnits: normalizeResponsibleUnits(project.responsibleUnits),
+      projectDescription: project.projectDesc && project.projectDesc !== '-' ? project.projectDesc : undefined,
     })
     setEditModalVisible(true)
   }
@@ -128,17 +159,22 @@ export default function MouhuaDetail() {
     try {
       const values = await basicForm.validateFields()
       setEditLoading(true)
-      setProject(prev => ({
-        ...prev,
-        projectName: values.projectName,
-        projectCategory: values.projectCategory,
-        capitalNature: values.capitalNature,
-        industryCategory: values.industryType,
-        investorEntity: values.investorEntity,
-        investorContactPerson: values.investorContactPerson,
-        investorContactPhone: values.investorContactPhone,
-        projectDesc: values.projectDescription,
-      }))
+      setProject(prev => {
+        const mergedFormValues = { ...(prev._formValues || {}), ...values }
+        return {
+          ...prev,
+          projectName: values.projectName,
+          capitalNature: values.capitalNature,
+          sourceRegion: values.sourceRegion,
+          sourceArea: values.sourceRegion ? values.sourceRegion.join(' / ') : prev.sourceArea,
+          industryCategory: values.industryType,
+          industryType: values.industryCategory ? values.industryCategory.join(' / ') : prev.industryType,
+          investAmount: values.investAmount,
+          responsibleUnits: normalizeResponsibleUnits(values.responsibleUnits),
+          projectDesc: values.projectDescription,
+          _formValues: mergedFormValues,
+        }
+      })
       message.success('基础信息已更新')
       setEditModalVisible(false)
     } catch (e) {
@@ -244,6 +280,10 @@ export default function MouhuaDetail() {
 
   const formItemLayout = { labelCol: { span: 8 }, wrapperCol: { span: 16 } }
 
+  const editSourceRegionOptions = editCapitalNature === '外资'
+    ? FOREIGN_COUNTRY_OPTIONS.map(c => ({ label: c, value: c }))
+    : editCapitalNature === '内资' ? DOMESTIC_REGION_OPTIONS : []
+
   return (
     <div className="page-container">
       <div className="table-card" style={pageCardStyle}>
@@ -289,18 +329,16 @@ export default function MouhuaDetail() {
                     labelStyle={{ width: 140, background: '#fafafa', fontWeight: 500 }}
                     contentStyle={{ minWidth: 200 }}
                   >
+                    <Descriptions.Item label="区级项目编码">{project.districtProjectCode || '-'}</Descriptions.Item>
                     <Descriptions.Item label="项目名称">{project.projectName}</Descriptions.Item>
-                    <Descriptions.Item label="项目分类">{project.projectCategory}</Descriptions.Item>
-                    <Descriptions.Item label="内外资">{project.capitalNature}</Descriptions.Item>
+                    <Descriptions.Item label="计划投资总额(亿元)">{formatInvestAmount(project.investAmount)}</Descriptions.Item>
+                    <Descriptions.Item label="内外资">{project.capitalNature || '-'}</Descriptions.Item>
                     <Descriptions.Item label="来源地">{project.sourceArea}</Descriptions.Item>
                     <Descriptions.Item label="产业类别">{project.industryCategory}</Descriptions.Item>
                     <Descriptions.Item label="行业类别">{project.industryType}</Descriptions.Item>
-                    <Descriptions.Item label="965产业链类别">{project.chainType965}</Descriptions.Item>
-                    <Descriptions.Item label="投资主体">{project.investorEntity}</Descriptions.Item>
-                    <Descriptions.Item label="投资主体联系人">{project.investorContactPerson}</Descriptions.Item>
-                    <Descriptions.Item label="联系电话">{project.investorContactPhone}</Descriptions.Item>
                     <Descriptions.Item label="申报人">{project.reporter}</Descriptions.Item>
                     <Descriptions.Item label="申报时间">{project.reportTime}</Descriptions.Item>
+                    <Descriptions.Item label="责任单位" span={2}>{renderUnits(project.responsibleUnits)}</Descriptions.Item>
                     <Descriptions.Item label="项目简介" span={2}>
                       <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>{project.projectDesc}</div>
                     </Descriptions.Item>
@@ -343,17 +381,21 @@ export default function MouhuaDetail() {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item label="项目分类" name="projectCategory" rules={[{ required: true, message: '请选择项目分类' }]}>
-                <Select placeholder="请选择项目分类">
-                  {PROJECT_CATEGORY_OPTIONS.map(o => <Option key={o} value={o}>{o}</Option>)}
+              <Form.Item label="内外资" name="capitalNature" rules={[{ required: true, message: '请选择内外资' }]}>
+                <Select placeholder="请选择内外资" onChange={() => basicForm.setFieldValue('sourceRegion', undefined)}>
+                  {CAPITAL_NATURE_OPTIONS.map(o => <Option key={o} value={o}>{o}</Option>)}
                 </Select>
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item label="内外资" name="capitalNature" rules={[{ required: true, message: '请选择内外资' }]}>
-                <Select placeholder="请选择内外资">
-                  {CAPITAL_NATURE_OPTIONS.map(o => <Option key={o} value={o}>{o}</Option>)}
-                </Select>
+              <Form.Item label="来源地" name="sourceRegion" rules={[{ required: true, message: '请选择来源地' }]}>
+                <Cascader
+                  options={editSourceRegionOptions}
+                  placeholder={editCapitalNature === '外资' ? '请选择国家' : editCapitalNature === '内资' ? '请选择省份/城市' : '请先选择内外资'}
+                  expandTrigger="hover"
+                  showSearch
+                  disabled={!editCapitalNature}
+                />
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -364,21 +406,23 @@ export default function MouhuaDetail() {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item label="投资主体" name="investorEntity" rules={[{ required: true, message: '请输入投资主体' }]}>
-                <Input placeholder="请输入投资主体" />
+              <Form.Item label="行业类别" name="industryCategory" rules={[{ required: true, message: '请选择行业类别' }]}>
+                <Cascader
+                  options={INDUSTRY_CASCADER_OPTIONS}
+                  placeholder="请选择行业类别（门类/大类）"
+                  expandTrigger="hover"
+                  showSearch
+                />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item label="投资主体联系人" name="investorContactPerson" rules={[{ required: true, message: '请输入联系人' }]}>
-                <Input placeholder="请输入联系人姓名" />
+              <Form.Item label="计划投资总额(亿元)" name="investAmount" rules={[{ required: true, message: '请输入计划投资总额' }, { type: 'number', min: 0.01, message: '计划投资总额需大于0' }]}>
+                <InputNumber style={{ width: '100%' }} placeholder="请输入" min={0} precision={2} addonAfter="亿元" />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item label="联系电话" name="investorContactPhone" rules={[
-                { required: true, message: '请输入联系电话' },
-                { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号' }
-              ]}>
-                <Input placeholder="请输入联系电话" maxLength={15} />
+              <Form.Item label="责任单位" name="responsibleUnits" rules={[{ required: true, message: '请选择责任单位（至少1个）' }]}>
+                <Select mode="multiple" options={RESPONSIBLE_UNIT_SELECT_GROUPS} placeholder="请选择责任单位" showSearch allowClear maxTagCount="responsive" />
               </Form.Item>
             </Col>
             <Col span={24}>

@@ -262,12 +262,14 @@ export default function MainLayout() {
               style={{ fontSize: 16, color: '#8c8c8c', cursor: 'pointer' }}
               onClick={() => message.info('搜索功能开发中')}
             />
-            <Badge count={unread} size="small">
-              <BellOutlined
-                style={{ fontSize: 16, color: '#8c8c8c', cursor: 'pointer' }}
-                onClick={() => navigate('/system/notice')}
-              />
-            </Badge>
+            <span style={{ display: 'inline-flex', marginRight: 12 }}>
+              <Badge count={unread} size="small">
+                <BellOutlined
+                  style={{ fontSize: 16, color: '#8c8c8c', cursor: 'pointer' }}
+                  onClick={() => navigate('/system/notice')}
+                />
+              </Badge>
+            </span>
             <Dropdown menu={{ items: userMenuItems, onClick: handleUserMenuClick }} placement="bottomRight">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                 <Avatar size="small" icon={<UserOutlined />} style={{ background: role.isSponsor ? '#1677ff' : '#fa8c16' }} />

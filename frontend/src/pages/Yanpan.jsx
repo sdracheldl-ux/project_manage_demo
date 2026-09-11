@@ -75,7 +75,7 @@ export default function Yanpan() {
         importTime: '2026-09-02 11:20',
         investorEntity: '武汉光谷半导体技术有限公司',
         investAmount: 6.8,
-        existingInvestAmount: 6.0,
+        existingInvestAmount: 6.3,
       },
       {
         id: 'yp-002',

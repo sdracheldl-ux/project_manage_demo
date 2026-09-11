@@ -201,13 +201,13 @@ const MOCK_YANPAN_DETAIL = {
     existingData: {
       projectName: '光电子信息产业园一期',
       investorEntity: '华星光电技术有限公司',
-      investAmount: 10.2,
+      investAmount: 10.0,
       industryCategory: '光电子信息',
       industryType: '光电子信息',
       importSource: '投促局',
       reporter: '投促局 易成豪',
       reportTime: '2026-06-15',
-      projectDesc: '投资10.2亿元建设光电子信息产业园一期，已签约落地。',
+      projectDesc: '投资10亿元建设光电子信息产业园一期，已签约落地。',
       contactPerson: '钱总',
       contactPhone: '137****7777',
       address: '东湖高新区左岭',
@@ -243,13 +243,13 @@ const MOCK_YANPAN_DETAIL = {
     existingData: {
       projectName: '智慧供应链管理平台',
       investorEntity: '京东物流科技有限公司',
-      investAmount: 4.5,
+      investAmount: 3.0,
       industryCategory: '现代物流',
       industryType: '现代服务业',
       importSource: '物流园',
       reporter: '物流园-周主管',
       reportTime: '2026-07-10',
-      projectDesc: '投资4.5亿元建设智慧供应链管理平台，覆盖仓储、运输、订单全链路数字化。',
+      projectDesc: '投资3亿元建设智慧供应链管理平台，覆盖仓储、运输、订单全链路数字化。',
       contactPerson: '周主管',
       contactPhone: '138****5678',
       address: '东湖高新区物流园',
@@ -283,8 +283,7 @@ function compareField(newValue, oldValue) {
     const diff = Math.abs(newValue - oldValue)
     const maxVal = Math.max(newValue, oldValue)
     const deviation = maxVal > 0 ? (diff / maxVal * 100) : 0
-    if (deviation < 5) return { status: 'similar', similarity: 95, deviation }
-    if (deviation < 20) return { status: 'different', similarity: 80, deviation }
+    if (deviation <= 10) return { status: 'similar', similarity: 95, deviation }
     return { status: 'different', similarity: 60, deviation }
   }
 

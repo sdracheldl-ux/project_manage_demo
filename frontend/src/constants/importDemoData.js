@@ -133,7 +133,7 @@ export function buildImportResult({ stage, stageLabel, importUser, importSource 
         importSource: source,
         reporter: importUser,
         reportTime: TODAY,
-        projectDesc: '拟投资4.2亿元建设光电子芯片封装测试基地，含COB封装产线与可靠性实验室。',
+        projectDesc: '拟投资4.5亿元建设光电子芯片封装测试基地，含COB封装产线与可靠性实验室。',
         contactPerson: '陈工',
         contactPhone: '137****8866',
         address: '东湖高新区光谷芯中心',

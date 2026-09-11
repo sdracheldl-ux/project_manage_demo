@@ -7,7 +7,6 @@ import {
   FileProtectOutlined,
   CheckCircleOutlined,
   FundOutlined,
-  GlobalOutlined,
   DownloadOutlined,
   ReloadOutlined,
   BulbOutlined,
@@ -45,7 +44,6 @@ const PARK_ORDER = ['生物城', '未来城', '综保区', '光电园', '服务�
 // 演示口径：无外资金额字段时，按 1 美元≈7 元人民币折算（1亿元 ≈ 1428.57万美元）
 const RMB_PER_USD = 7
 const toUsd = (yi) => Math.round(num(yi) * (10000 / RMB_PER_USD))
-const fmtUsd = (v) => Number(v).toLocaleString('zh-CN')
 
 // 各阶段数据：谋划/在谈 取自 zaitan 数组前4条（与谋划列表页 slice 一致），在谈为其余记录
 const MOUHUA_ROWS = (mockData.zaitan || []).slice(0, 4)
@@ -567,38 +565,6 @@ export default function DashboardProject() {
             unit="亿元"
             bgColor="linear-gradient(135deg,#fff7e6,#ffe7ba)"
             icon={<FundOutlined style={{ fontSize: 22, color: ORANGE }} />}
-          />
-        </Col>
-      </Row>
-
-      <Row gutter={[12, 12]} style={{ marginTop: 12 }}>
-        <Col xs={24} sm={12} xl={8}>
-          <StatCard
-            title="到位资金情况(亿元)"
-            hint={KPI_HINTS.arrival}
-            value={fmtMoney(stats.arrivalTotal)}
-            bgColor="linear-gradient(135deg,#e6f4ff,#bae0ff)"
-            icon={<DownloadOutlined style={{ fontSize: 22, color: BLUE }} />}
-          />
-        </Col>
-        <Col xs={24} sm={12} xl={8}>
-          <StatCard
-            title="区间 FDI 项目数"
-            hint={KPI_HINTS.fdiCount}
-            value={stats.fdiCount}
-            unit="个"
-            bgColor="linear-gradient(135deg,#f0f5ff,#d6e4ff)"
-            icon={<GlobalOutlined style={{ fontSize: 22, color: BLUE }} />}
-          />
-        </Col>
-        <Col xs={24} sm={12} xl={8}>
-          <StatCard
-            title="区间 FDI 项目金额"
-            hint={KPI_HINTS.fdiAmount}
-            value={fmtUsd(stats.fdiUsdTotal)}
-            unit="万美元"
-            bgColor="linear-gradient(135deg,#f0f5ff,#d6e4ff)"
-            icon={<GlobalOutlined style={{ fontSize: 22, color: BLUE }} />}
           />
         </Col>
       </Row>

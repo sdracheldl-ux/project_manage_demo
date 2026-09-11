@@ -192,3 +192,95 @@ export function useImported() {
   }, [])
   return importStore.getImported()
 }
+
+// 全局移交store（在谈项目移交：仅支持一次，双方共同管理）
+// transfers: [{ id, projectId, projectName, toDeptKey, toDeptName, reason, by, time }]
+let transfers = []
+const transferListeners = new Set()
+
+export const transferStore = {
+  getTransfers() {
+    return transfers
+  },
+  getTransferByProject(projectId) {
+    return transfers.find(t => String(t.projectId) === String(projectId)) || null
+  },
+  hasTransferred(projectId) {
+    return !!transferStore.getTransferByProject(projectId)
+  },
+  getTransfersByDept(deptKey) {
+    return transfers.filter(t => t.toDeptKey === deptKey)
+  },
+  addTransfer(record) {
+    // 一次移交约束：已有记录则忽略
+    if (transferStore.hasTransferred(record.projectId)) return
+    transfers = [{ id: `tr-${Date.now()}`, ...record }, ...transfers]
+    transferListeners.forEach(fn => fn())
+  },
+  subscribe(fn) {
+    transferListeners.add(fn)
+    return () => transferListeners.delete(fn)
+  },
+}
+
+export function useTransferStore() {
+  const [, tick] = useState(0)
+  useEffect(() => {
+    return transferStore.subscribe(() => tick(n => n + 1))
+  }, [])
+  return transferStore.getTransfers()
+}
+
+// 全局退库审核store（签约项目退库：申请 → 投促局审核 → 通过/驳回）
+// audits: [{ id, projectId, projectName, reason, applicantDeptKey, applicantDeptName,
+//            applyTime, status: 'pending' | 'approved' | 'rejected',
+//            auditTime, auditor, auditOpinion }]
+let tuikuAudits = []
+const tuikuAuditListeners = new Set()
+
+export const tuikuAuditStore = {
+  getAuditList() {
+    return tuikuAudits
+  },
+  getByProject(projectId) {
+    return tuikuAudits.find(a => String(a.projectId) === String(projectId)) || null
+  },
+  hasPending(projectId) {
+    const a = tuikuAuditStore.getByProject(projectId)
+    return !!a && a.status === 'pending'
+  },
+  addApply(record) {
+    // 同一项目已有驳回记录则复用该记录（状态切回待审核并更新申请信息），否则新建
+    const exist = tuikuAudits.find(a => String(a.projectId) === String(record.projectId) && a.status === 'rejected')
+    if (exist) {
+      tuikuAudits = tuikuAudits.map(a => (
+        a.id === exist.id
+          ? { ...a, ...record, status: 'pending', auditTime: undefined, auditor: undefined, auditOpinion: undefined }
+          : a
+      ))
+    } else {
+      tuikuAudits = [{ id: `ta-${Date.now()}`, status: 'pending', ...record }, ...tuikuAudits]
+    }
+    tuikuAuditListeners.forEach(fn => fn())
+  },
+  audit(id, { result, opinion, auditor }) {
+    tuikuAudits = tuikuAudits.map(a => (
+      a.id === id
+        ? { ...a, status: result, auditTime: new Date().toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-'), auditor, auditOpinion: opinion }
+        : a
+    ))
+    tuikuAuditListeners.forEach(fn => fn())
+  },
+  subscribe(fn) {
+    tuikuAuditListeners.add(fn)
+    return () => tuikuAuditListeners.delete(fn)
+  },
+}
+
+export function useTuikuAuditStore() {
+  const [, tick] = useState(0)
+  useEffect(() => {
+    return tuikuAuditStore.subscribe(() => tick(n => n + 1))
+  }, [])
+  return tuikuAuditStore.getAuditList()
+}

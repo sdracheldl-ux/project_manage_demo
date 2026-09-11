@@ -52,12 +52,30 @@ export default function GenericProjectList({
 
   const data = useMemo(() => dataList, [dataList])
 
+  // 任意值 -> 数组（兼容数组 / 顿号分隔 / 单值）
+  const toArr = (v) => {
+    if (v === undefined || v === null || v === '') return []
+    if (Array.isArray(v)) return v.filter(Boolean)
+    return String(v).split(/[、,，]/).map((s) => s.trim()).filter(Boolean)
+  }
+
   const filteredData = useMemo(() => {
     return data.filter(r => {
       if (filters.projectName && !(r.projectName || r['项目名称'] || '').includes(filters.projectName)) return false
+      // 附加筛选项：对 extraFilters 定义 key/dataIndex 的真实过滤
+      for (const f of extraFilters || []) {
+        const sel = filters[f.key]
+        const emptySel = sel === undefined || sel === null || sel === '' || (Array.isArray(sel) && sel.length === 0)
+        if (emptySel) continue
+        const idx = f.dataIndex || f.dataKey || f.key
+        const raw = idx ? r[idx] : undefined
+        const rowHits = toArr(raw)
+        const sels = Array.isArray(sel) ? sel : [sel]
+        if (!sels.some((s) => rowHits.includes(s))) return false
+      }
       return true
     })
-  }, [data, filters])
+  }, [data, filters, extraFilters])
 
   const pageData = useMemo(() => {
     const start = (pagination.current - 1) * pagination.pageSize
@@ -235,9 +253,14 @@ export default function GenericProjectList({
                   placeholder={f.placeholder || ['开始日期', '结束日期']}
                   onChange={(v) => setFilters({ ...filters, [f.key]: v })} />
               }
-              return <Select key={f.key} placeholder={f.label} {...selectCommon} style={{ width: f.width || fw }}
-                value={filters[f.key]} onChange={(v) => setFilters({ ...filters, [f.key]: v })}
-                options={f.options} />
+              return <Select key={f.key} placeholder={f.label} {...selectCommon}
+                mode={f.multiple ? 'multiple' : undefined}
+                options={f.options}
+                showSearch
+                allowClear
+                maxTagCount="responsive"
+                style={{ width: f.width || (f.multiple ? 220 : fw) }}
+                value={filters[f.key]} onChange={(v) => setFilters({ ...filters, [f.key]: v })} />
             })}
           </div>
         )}

@@ -1,15 +1,33 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Tag, Tooltip, Space, Divider, Modal, Form, Input, Select, Cascader, Row, Col, message, Dropdown } from 'antd'
+import { Tag, Tooltip, Space, Divider, Modal, Form, Input, InputNumber, Select, Cascader, Row, Col, message, Dropdown, Alert, Button } from 'antd'
 import { EyeOutlined, FileTextOutlined, EditOutlined, MoreOutlined, PauseCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
 import GenericProjectList from '../components/GenericProjectList'
 import TransferToZaitanModal from '../components/TransferToZaitanModal'
+import DuplicateWarningModal from '../components/DuplicateWarningModal'
 import mockData from '../mock/data.json'
+import { checkDuplicates, buildZaitanLib } from '../utils/duplicateCheck'
+import { RESPONSIBLE_UNIT_SELECT_GROUPS, RESPONSIBLE_UNIT_OPTIONS, normalizeResponsibleUnits, generateDistrictCode, DISTRICT_CODE_SEEDS } from '../constants/projectEnums'
 
 const { TextArea } = Input
 const { Option } = Select
 
 const actionLinkStyle = { color: '#1677ff', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 14, cursor: 'pointer' }
+
+const unitTagStyle = { background: '#e6f4ff', color: '#1677ff', border: '1px solid #91caff', borderRadius: 4, marginInlineEnd: 6 }
+
+// 责任单位渲染：空显示 '-'；每项浅蓝 Tag，最多 3 个，超出用 +N 收起
+function renderUnits(v) {
+  const list = normalizeResponsibleUnits(v)
+  if (list.length === 0) return '-'
+  const shown = list.slice(0, 3)
+  return (
+    <span>
+      {shown.map(u => <Tag key={u} style={unitTagStyle}>{u}</Tag>)}
+      {list.length > 3 && <Tag style={unitTagStyle}>+{list.length - 3}</Tag>}
+    </span>
+  )
+}
 
 const MOUHUA_TYPES = ['产业招商', '产业链配套', '平台招商', '以商招商']
 const MOUHUA_SOURCES = ['区级自主谋划', '市级交办', '企业主动对接', '校友资源', '楚商资源']
@@ -481,6 +499,13 @@ export default function Mouhua() {
   const [tuikuVisible, setTuikuVisible] = useState(false)
   const [tuikuRecord, setTuikuRecord] = useState(null)
   const [tuikuReason, setTuikuReason] = useState('')
+  // ===== 实时判重（PRD 2.1.8 场景一）=====
+  const [warnVisible, setWarnVisible] = useState(false)
+  const [warnHits, setWarnHits] = useState([])
+  const [warnValues, setWarnValues] = useState(null)
+  const [l4Hits, setL4Hits] = useState([])
+  const [l4Expanded, setL4Expanded] = useState(false)
+  const l4AckRef = useRef(false) // L4 提示后放行：再次提交直接保存
   const capitalNature = Form.useWatch('capitalNature', form)
 
   const handleViewDetail = (record) => {
@@ -497,6 +522,7 @@ export default function Mouhua() {
     const base = mockData.zaitan.slice(0, 4).map((item, idx) => ({
       key: `mouhua-${idx + 1}`,
       index: idx + 1,
+      districtProjectCode: item['区级项目编码'] || DISTRICT_CODE_SEEDS[idx % DISTRICT_CODE_SEEDS.length],
       reporter: item['申报人'] || '-',
       projectStatus: '谋划中',
       projectName: item['项目名称'] || '-',
@@ -506,6 +532,7 @@ export default function Mouhua() {
       projectDesc: item['项目简介'] || '-',
       investorEntity: item['投资主体'] || '-',
       investAmount: item['投资金额（亿元）'] || mockFormValues[idx].investAmount,
+      responsibleUnits: [RESPONSIBLE_UNIT_OPTIONS[idx % RESPONSIBLE_UNIT_OPTIONS.length]],
       enterpriseNature: item['企业性质'] || '-',
       mouhuaType: MOUHUA_TYPES[idx % MOUHUA_TYPES.length],
       mouhuaSource: MOUHUA_SOURCES[idx % MOUHUA_SOURCES.length],
@@ -519,6 +546,7 @@ export default function Mouhua() {
 
   const columns = useMemo(() => [
     { key: 'index', title: '序号', dataIndex: 'index', width: 55, align: 'center', fixed: 'left', required: true },
+    { key: 'districtProjectCode', title: '区级项目编码', dataIndex: 'districtProjectCode', width: 130, align: 'center' },
     { key: 'reporter', title: '申报人', dataIndex: 'reporter', width: 120, align: 'left', fixed: 'left', ellipsis: true },
     { key: 'projectName', title: '项目名称', dataIndex: 'projectName', width: 220, ellipsis: true, required: true,
       render: (v, record) => (
@@ -530,9 +558,11 @@ export default function Mouhua() {
     { key: 'industryCategory', title: '产业类别', dataIndex: 'industryCategory', width: 80, align: 'center' },
     { key: 'industryType', title: '行业类别', dataIndex: 'industryType', width: 180, ellipsis: true },
     { key: 'sourceArea', title: '来源地', dataIndex: 'sourceArea', width: 120, ellipsis: true },
-    { key: 'investorEntity', title: '投资主体', dataIndex: 'investorEntity', width: 180, ellipsis: true },
-    { key: 'investAmount', title: '投资金额(亿元)', dataIndex: 'investAmount', width: 130, align: 'right', sorter: true,
+    { key: 'investAmount', title: '计划投资总额(亿元)', dataIndex: 'investAmount', width: 140, align: 'right', sorter: true,
       render: (v) => <span style={{ fontWeight: 600 }}>{Number(v).toFixed(2)}</span>
+    },
+    { key: 'responsibleUnits', title: '责任单位', dataIndex: 'responsibleUnits', width: 220, ellipsis: true,
+      render: (v) => renderUnits(v)
     },
     { key: 'reportTime', title: '申报时间', dataIndex: 'reportTime', width: 120, align: 'center' },
     { key: 'action', title: '操作', dataIndex: 'action', width: 260, fixed: 'right', align: 'center', required: true,
@@ -581,10 +611,15 @@ export default function Mouhua() {
     },
   ], [])
 
-  const extraFilters = []
+  const extraFilters = [
+    { key: 'responsibleUnits', dataIndex: 'responsibleUnits', label: '责任单位', type: 'select', multiple: true, options: RESPONSIBLE_UNIT_SELECT_GROUPS },
+  ]
 
   const handleAdd = () => {
     form.resetFields()
+    setL4Hits([])
+    setL4Expanded(false)
+    l4AckRef.current = false
     setAddModalVisible(true)
   }
 
@@ -611,21 +646,23 @@ export default function Mouhua() {
     message.success('该项目已从谋划列表移至在谈列表')
   }
 
-  const handleAddOk = async () => {
+  // 执行保存（判重通过 / L4 放行 / 预警「仍要提交」后调用）
+  const doAddSave = async (values) => {
     try {
-      const values = await form.validateFields()
       setAddLoading(true)
       // 构造级联选择的显示文本
       const industryLabel = values.industryCategory ? values.industryCategory.join(' / ') : '-'
-      const chainLabel = values.chainType965 ? values.chainType965.join(' / ') : '-'
       const sourceLabel = values.sourceRegion ? values.sourceRegion.join(' / ') : '-'
       const now = new Date()
       const pad = (n) => String(n).padStart(2, '0')
       const timeStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`
 
+      // 区级项目编码：新增项目后由系统自动创建
+      const districtProjectCode = generateDistrictCode()
       const newItem = {
         key: `mouhua-new-${Date.now()}`,
         index: dataList.length + 1,
+        districtProjectCode,
         reporter: '投促局管理员',
         projectStatus: '谋划中',
         projectName: values.projectName,
@@ -633,25 +670,78 @@ export default function Mouhua() {
         industryCategory: values.industryType,
         industryType: industryLabel,
         projectDesc: values.projectDescription,
-        investorEntity: values.investorEntity,
-        investAmount: 0,
+        investAmount: values.investAmount,
+        responsibleUnits: values.responsibleUnits || [],
         enterpriseNature: '-',
-        mouhuaType: values.projectCategory,
         mouhuaSource: '区级自主谋划',
         reportTime: timeStr,
         auditStatus: '待审核',
-        projectCategory: values.projectCategory,
         _formValues: { ...values },
       }
       setExtraDataList(prev => [newItem, ...prev])
-      message.success('谋划项目新增成功（demo示意）')
+      message.success(`谋划项目新增成功，区级项目编码：${districtProjectCode}`)
       setAddModalVisible(false)
       form.resetFields()
-    } catch (err) {
-      // validation error, do nothing
+      setL4Hits([])
+      setL4Expanded(false)
+      l4AckRef.current = false
     } finally {
       setAddLoading(false)
     }
+  }
+
+  const handleAddOk = async () => {
+    try {
+      const values = await form.validateFields()
+      // ===== 实时判重（PRD 2.1.8 场景一）：比对谋划库 + 在谈库，提交结果不进入研判池 =====
+      const now = new Date()
+      const pad = (n) => String(n).padStart(2, '0')
+      const hits = checkDuplicates({
+        projectName: values.projectName,
+        investAmount: values.investAmount,
+        industryCategory: values.industryType || '',
+        industryType: values.industryCategory ? values.industryCategory.join(' / ') : '',
+        reporter: '投促局管理员',
+        reportTime: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+      }, [
+        { stage: '谋划', rows: dataList },
+        { stage: '在谈', rows: buildZaitanLib() },
+      ])
+      const strongHits = hits.filter(h => h.level !== 'L4')
+      const l4Only = hits.filter(h => h.level === 'L4')
+      if (strongHits.length > 0) {
+        // L1 阻断 / L2·L3 二选一（预警弹窗）
+        setWarnValues(values)
+        setWarnHits(hits)
+        setWarnVisible(true)
+        return
+      }
+      if (l4Only.length > 0 && !l4AckRef.current) {
+        // L4 弱提示：表单保持打开，顶部提示条，可展开冲突列表；再次提交直接保存
+        l4AckRef.current = true
+        setL4Hits(l4Only)
+        setL4Expanded(false)
+        message.warning('检测到与库中项目存在弱相似信号，建议核实是否重复；确认无误可再次提交')
+        return
+      }
+      await doAddSave(values)
+    } catch (err) {
+      // validation error, do nothing
+    }
+  }
+
+  const handleWarnReturn = () => {
+    setWarnVisible(false)
+    setWarnHits([])
+    setWarnValues(null)
+  }
+
+  const handleWarnForce = async () => {
+    setWarnVisible(false)
+    setWarnHits([])
+    const values = warnValues
+    setWarnValues(null)
+    if (values) await doAddSave(values)
   }
 
   const formItemLayout = {
@@ -669,7 +759,7 @@ export default function Mouhua() {
         dataList={dataList}
         columns={columns}
         filters={extraFilters}
-        scrollX={1500}
+        scrollX={1630}
         canAdd={true}
         canImport={false}
         onAdd={handleAdd}
@@ -688,17 +778,37 @@ export default function Mouhua() {
         bodyStyle={{ padding: '24px', maxHeight: '70vh', overflowY: 'auto' }}
       >
         <Form form={form} {...formItemLayout} layout="horizontal" requiredMark={true} colon={false}>
+          {/* L4 弱提示：不阻断，可展开冲突项目列表（名称/阶段/链接） */}
+          {l4Hits.length > 0 && (
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message="检测到与库中项目存在弱相似信号，建议核实是否重复"
+              action={
+                <Button type="link" size="small" onClick={() => setL4Expanded(!l4Expanded)}>
+                  {l4Expanded ? '收起' : '展开冲突项目'}
+                </Button>
+              }
+              description={l4Expanded ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {l4Hits.map((h, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <a onClick={() => { setAddModalVisible(false); setWarnVisible(false); navigate(`/project/${h.target.stage === '在谈' ? 'zaitan' : 'mouhua'}/detail/${h.target.key}`) }}>
+                        {h.target.projectName}
+                      </a>
+                      <Tag bordered={false}>{h.target.stageLabel}</Tag>
+                      <span style={{ color: '#8c8c8c', fontSize: 12 }}>{h.reason}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : undefined}
+            />
+          )}
           <Row gutter={24}>
             <Col span={12}>
               <Form.Item label="项目名称" name="projectName" rules={[{ required: true, message: '请输入项目名称' }, { max: 40, message: '项目名称不超过40个字符' }]}>
                 <Input placeholder="请输入项目名称" maxLength={40} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item label="项目分类" name="projectCategory" rules={[{ required: true, message: '请选择项目分类' }]}>
-                <Select placeholder="请选择项目分类">
-                  {PROJECT_CATEGORY_OPTIONS.map(o => <Option key={o} value={o}>{o}</Option>)}
-                </Select>
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -737,31 +847,13 @@ export default function Mouhua() {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item label="965产业链类别" name="chainType965" rules={[{ required: true, message: '请选择965产业链类别' }]}>
-                <Cascader
-                  options={CHAIN_965_CASCADER_OPTIONS}
-                  placeholder='请选择对应"965"产业链类别（主链/子链）'
-                  expandTrigger="hover"
-                  showSearch
-                />
+              <Form.Item label="计划投资总额(亿元)" name="investAmount" rules={[{ required: true, message: '请输入计划投资总额' }, { type: 'number', min: 0.01, message: '计划投资总额需大于0' }]}>
+                <InputNumber style={{ width: '100%' }} placeholder="请输入" min={0} precision={2} addonAfter="亿元" />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item label="投资主体" name="investorEntity" rules={[{ required: true, message: '请输入投资主体' }]}>
-                <Input placeholder="请输入投资主体" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item label="投资主体联系人" name="investorContactPerson" rules={[{ required: true, message: '请输入联系人' }]}>
-                <Input placeholder="请输入联系人姓名" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item label="联系电话" name="investorContactPhone" rules={[
-                { required: true, message: '请输入联系电话' },
-                { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号' }
-              ]}>
-                <Input placeholder="请输入联系电话" maxLength={15} />
+              <Form.Item label="责任单位" name="responsibleUnits" rules={[{ required: true, message: '请选择责任单位（至少1个）' }]}>
+                <Select mode="multiple" options={RESPONSIBLE_UNIT_SELECT_GROUPS} placeholder="请选择责任单位" showSearch allowClear maxTagCount="responsive" />
               </Form.Item>
             </Col>
             <Col span={24}>
@@ -798,6 +890,16 @@ export default function Mouhua() {
         onCancel={() => setTransferModalVisible(false)}
         onOk={handleTransferOk}
         projectData={currentTransferProject}
+      />
+
+      {/* 实时判重预警弹窗（L1 阻断 / L2·L3 二选一） */}
+      <DuplicateWarningModal
+        open={warnVisible}
+        hits={warnHits}
+        contextTitle="新增谋划项目"
+        onReturn={handleWarnReturn}
+        onForce={handleWarnForce}
+        onCloseAll={() => { setAddModalVisible(false); setWarnVisible(false) }}
       />
 
       {/* 退库确认弹窗 */}

@@ -283,6 +283,25 @@ export const CORE_DECISION_OPTIONS = {
 
 // ========== 签约阶段新增枚举 ==========
 
+// 用地情况
+export const LAND_SITUATION_OPTIONS = ['新供地', '现有用地', '租赁厂房', '购买房产', '其他']
+
+// ===== 区级项目编码 =====
+// 格式：YYYYMMDD + 3位序号（如 20260910001），在谋划阶段新增项目后由系统自动创建
+export const generateDistrictCode = () => {
+  const now = new Date()
+  const pad = (n, len = 2) => String(n).padStart(len, '0')
+  const dateStr = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`
+  const seq = String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')
+  return `${dateStr}${seq}`
+}
+
+// 存量演示数据的区级项目编码种子（mock 原始数据无此字段）
+export const DISTRICT_CODE_SEEDS = ['20260508001', '20260512002', '20260420003', '20260506004']
+
+// 存量演示数据的市级项目编码种子（mock 原始数据无此字段）
+export const CITY_CODE_SEEDS = ['SJ20260301001', 'SJ20260302015', 'SJ20260305023', 'SJ20260311008']
+
 // 协议类型
 export const AGREEMENT_TYPE_OPTIONS = ['投资协议', '框架协议', '补充协议', '其他']
 
@@ -413,3 +432,41 @@ export const GB_NATIONAL_INDUSTRY = [
 
 // 服务业类别（简化）
 export const SERVICE_INDUSTRY_OPTIONS = ['生产性服务业', '生活性服务业', '公共服务业']
+
+// ========== 责任单位（多选，分组字典，贯穿谋划/在谈/签约/落地） ==========
+export const RESPONSIBLE_UNIT_GROUPS = [
+  { label: '投促局', options: ['市投促局', '区投促局'] },
+  { label: '园区', options: [
+    '未来科技城', '光谷生物城', '光谷中心城', '东湖综合保税区',
+    '光电园', '服务业园', '智造园', '中华园',
+  ] },
+  { label: '国企/平台公司', options: [
+    '光谷科投集团', '光谷人才集团', '武汉高科集团', '光谷产投', '光谷金控', '湖北科投',
+  ] },
+  { label: '区直部门', options: [
+    '组织部', '宣传部', '发改局', '科创局', '企服局',
+    '规划局', '建设局', '金融局', '自贸改革创新局',
+  ] },
+  { label: '街道', options: ['佛祖岭街道', '豹澥街道', '九峰街道'] },
+]
+
+// 责任单位全量选项（扁平，用于校验/筛选）
+export const RESPONSIBLE_UNIT_OPTIONS = RESPONSIBLE_UNIT_GROUPS.reduce((acc, g) => acc.concat(g.options), [])
+
+// 责任单位分组选项（antd Select options 格式：{label, options:[{label,value}]}）
+export const RESPONSIBLE_UNIT_SELECT_GROUPS = RESPONSIBLE_UNIT_GROUPS.map(g => ({
+  label: g.label,
+  options: g.options.map(u => ({ label: u, value: u })),
+}))
+
+// 任意取值 -> 责任单位数组（兼容数组 / 顿号分隔字符串 / 单个字符串 / 空值）
+export function normalizeResponsibleUnits(v) {
+  if (v === undefined || v === null || v === '') return []
+  if (Array.isArray(v)) return v.filter(Boolean)
+  return String(v).split(/[、,，]/).map((s) => s.trim()).filter(Boolean)
+}
+
+// 责任单位数组 -> 展示文本（顿号连接）
+export function responsibleUnitsText(v) {
+  return normalizeResponsibleUnits(v).join('、')
+}

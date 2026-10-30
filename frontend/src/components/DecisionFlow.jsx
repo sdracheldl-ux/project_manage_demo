@@ -1,6 +1,14 @@
 // 决策节点流程图组件
 // 根据项目分类显示对应的横向流程节点，支持展示已通过/进行中/待通过状态
 
+// 全部决策节点（共 5 类）：国企投决会、投委会、常务会、供地会、不涉及
+const ALL_DECISION_NODES = [
+  { key: 'guoqitoujuehui', label: '国企投决会' },
+  { key: 'touweihui', label: '投委会' },
+  { key: 'changwuhui', label: '常务会' },
+  { key: 'gongdihui', label: '供地会' },
+]
+
 const NODE_SEQUENCE = {
   policy: [
     { key: 'touweihui', label: '投委会' },
@@ -16,6 +24,11 @@ const NODE_SEQUENCE = {
     { key: 'changwuhui', label: '常务会' },
     { key: 'gongdihui', label: '供地会' },
   ],
+}
+
+// 获取所有决策节点名称（用于筛选下拉等）
+export function getAllDecisionNodeLabels() {
+  return [...ALL_DECISION_NODES.map(n => n.label), '不涉及']
 }
 
 // 根据项目分类和投资额获取需要展示的节点序列

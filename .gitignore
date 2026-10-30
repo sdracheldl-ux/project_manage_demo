@@ -20,7 +20,12 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+.trae/
 *.swp
+
+# Screenshots
+screenshot-*.png
+feishu_qr*.png
 
 # Deploy script temp
 deploy.sh

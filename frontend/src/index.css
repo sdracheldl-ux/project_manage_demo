@@ -75,6 +75,1006 @@ body {
   align-items: center;
 }
 
+/* ========== 企业详情页顶部浅蓝色信息块 ==========
+ * 三列键值对铺排（窄屏自动降列），底部企业简介整行展示。
+ */
+.ent-header-block {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 32px;
+  row-gap: 4px;
+  background: #f2f8ff;
+  border: 1px solid #e1efff;
+  border-radius: 6px;
+  padding: 14px 20px 10px;
+}
+
+.ent-header-col {
+  min-width: 0;
+}
+
+.ent-header-item {
+  display: flex;
+  align-items: baseline;
+  font-size: 13px;
+  line-height: 28px;
+}
+
+.ent-header-label {
+  color: #8c8c8c;
+  flex-shrink: 0;
+}
+
+.ent-header-value {
+  color: #333;
+  word-break: break-all;
+  min-width: 0;
+}
+
+/* 地址：单行省略，hover 展示完整内容 */
+.ent-header-addr {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: normal;
+  min-width: 0;
+  flex: 1;
+}
+
+.ent-years-tag {
+  display: inline-block;
+  padding: 0 5px;
+  font-size: 12px;
+  line-height: 18px;
+  color: #52c41a;
+  background: #f6ffed;
+  border: 1px solid #b7eb8f;
+  border-radius: 2px;
+  vertical-align: middle;
+}
+
+/* ========== 企业线索洞察 - 搜索首页 ========== */
+.ent-search-page {
+  min-height: 100%;
+  background-repeat: no-repeat;
+  background-position: right center;
+  background-size: cover;
+  background-attachment: scroll;
+}
+
+.ent-search-hero {
+  padding: 172px 0 0;
+  max-width: 1200px;
+  margin: 0 auto;
+  position: relative;
+  left: 100px;
+}
+
+.ent-search-wrap {
+  position: relative;
+  max-width: 620px;
+}
+
+.ent-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 8px 8px 16px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(22, 119, 255, .1);
+}
+
+.ent-search-input {
+  flex: 1;
+  border: none;
+  box-shadow: none !important;
+  padding: 0;
+}
+
+/* 搜索框与搜索按钮等高 */
+.ent-search-field.ant-input-affix-wrapper {
+  height: 44px;
+  align-items: center;
+}
+
+.ent-search-field.ant-input-affix-wrapper > input.ant-input {
+  height: auto;
+}
+
+.ent-search-input input {
+  font-size: 15px;
+}
+
+/* 输入框清除按钮（关闭）：尺寸放大 */
+.ent-search-input .ant-input-clear-icon {
+  font-size: 20px;
+  color: #bfbfbf;
+}
+
+.ent-search-input .ant-input-clear-icon:hover {
+  color: #8c8c8c;
+}
+
+/* 结果建议面板 */
+.ent-search-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .12);
+  overflow: hidden;
+  z-index: 30;
+}
+
+.ent-search-list {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 6px 0;
+}
+
+.ent-search-item {
+  padding: 11px 20px;
+  font-size: 14px;
+  color: #333;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+
+.ent-search-item:hover {
+  background: #f0f7ff;
+  color: #1677ff;
+}
+
+.ent-search-empty {
+  padding: 32px 20px;
+  text-align: center;
+  font-size: 13px;
+  color: #8c8c8c;
+}
+
+/* 最近搜索 */
+.ent-recent {
+  margin-top: 28px;
+  max-width: 620px;
+}
+
+.ent-recent-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: #8c8c8c;
+  margin-bottom: 12px;
+}
+
+.ent-recent-clear {
+  color: #1677ff;
+  cursor: pointer;
+}
+
+.ent-recent-clear:hover {
+  text-decoration: underline;
+}
+
+.ent-recent-empty {
+  font-size: 13px;
+  color: #bfbfbf;
+}
+
+.ent-recent-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ent-recent-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  padding: 4px 10px;
+  font-size: 13px;
+  color: #595959;
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color .15s, border-color .15s;
+}
+
+.ent-recent-tag:hover {
+  color: #1677ff;
+  border-color: #91caff;
+}
+
+.ent-recent-close {
+  font-size: 11px;
+  color: #bfbfbf;
+}
+
+.ent-recent-close:hover {
+  color: #ff4d4f;
+}
+
+@media (max-width: 1400px) {
+  .ent-header-block {
+    column-gap: 20px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .ent-header-block {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .ent-header-block {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ========== 企业详情页顶部 TAB 导航 ==========
+ * 一级模块横向排列（滚动时固定在内容区顶部）；
+ * 鼠标移入展开全量二级菜单面板，一级分组分列展示，hover 列高亮。
+ */
+.ent-tabnav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: #fff;
+  margin: 0 -24px;
+  padding: 0 24px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.ent-tabbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.ent-tabbar::-webkit-scrollbar {
+  display: none;
+}
+
+.ent-tab {
+  position: relative;
+  flex-shrink: 0;
+  padding: 12px 14px;
+  font-size: 14px;
+  color: #333;
+  cursor: pointer;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  transition: color .2s, border-color .2s;
+}
+
+.ent-tab:hover {
+  color: #1677ff;
+}
+
+.ent-tab.active {
+  color: #1677ff;
+  font-weight: 600;
+  border-bottom-color: #1677ff;
+}
+
+/* 二级菜单面板：按一级分组分列 */
+.ent-tabpanel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  max-height: 60vh;
+  overflow-y: auto;
+  background: #fff;
+  border-bottom: 1px solid #e8e8e8;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .08);
+  padding: 16px 0 20px;
+  z-index: 19;
+}
+
+.ent-tabpanel-col {
+  flex: 1 1 0;
+  min-width: 150px;
+  padding: 0 16px;
+  border-right: 1px solid #f5f5f5;
+}
+
+.ent-tabpanel-col:last-child {
+  border-right: none;
+}
+
+.ent-tabpanel-head {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  padding-bottom: 8px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ent-tabpanel-col.hover .ent-tabpanel-head {
+  color: #1677ff;
+}
+
+.ent-tabpanel-item {
+  font-size: 13px;
+  color: #8c8c8c;
+  padding: 4px 0;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ent-tabpanel-item-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ent-tabpanel-item-count {
+  flex: none;
+  font-size: 12px;
+  color: #bfbfbf;
+  font-variant-numeric: tabular-nums;
+}
+
+.ent-tabpanel-item.active .ent-tabpanel-item-count {
+  color: #1677ff;
+}
+
+.ent-tabpanel-item:hover {
+  color: #1677ff;
+}
+
+.ent-tabpanel-item:hover .ent-tabpanel-item-count {
+  color: #1677ff;
+}
+
+.ent-tabpanel-item.active {
+  color: #1677ff;
+  font-weight: 600;
+}
+
+/* ========== 企业线索洞察 - 检索结果列表页 ========== */
+.ent-result-page {
+  background: #f0f2f5;
+}
+
+/* 顶部搜索栏 */
+.ent-result-topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: #fff;
+  border-radius: 4px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+}
+
+.ent-result-searchbar {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 760px;
+}
+
+/* 筛选条件面板 */
+.ent-filter-card {
+  padding: 16px 24px 8px;
+  margin-bottom: 30px;
+  position: relative;
+}
+
+.ent-filter-body {
+  padding-top: 4px;
+}
+
+.ent-filter-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 7px 0;
+  font-size: 13px;
+}
+
+.ent-filter-label {
+  flex-shrink: 0;
+  width: 72px;
+  color: #333;
+  font-weight: 500;
+  line-height: 22px;
+}
+
+.ent-filter-options {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  min-width: 0;
+}
+
+.ent-filter-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #595959;
+  line-height: 22px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color .15s;
+}
+
+.ent-filter-opt:hover {
+  color: #1677ff;
+}
+
+.ent-filter-opt.is-active {
+  color: #1677ff;
+  font-weight: 500;
+}
+
+.ent-filter-count {
+  color: #bfbfbf;
+  font-size: 12px;
+}
+
+.ent-filter-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: #1677ff;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ent-filter-more:hover {
+  text-decoration: underline;
+}
+
+.ent-filter-arrow-up {
+  transform: rotate(180deg);
+}
+
+.ent-filter-actions {
+  padding: 4px 0 8px 84px;
+}
+
+/* 折叠/展开按钮（面板底部居中，白色梯形下凸） */
+.ent-filter-toggle {
+  position: absolute;
+  left: 50%;
+  bottom: -22px;
+  transform: translateX(-50%);
+  width: 104px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  font-size: 13px;
+  cursor: pointer;
+  z-index: 3;
+}
+
+.ent-filter-toggle::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  clip-path: polygon(0 0, 100% 0, 89% 100%, 11% 100%);
+  z-index: 0;
+}
+
+/* 展开/收起图标：置于梯形背景之上，居中显示 */
+.ent-filter-toggle .anticon {
+  position: relative;
+  z-index: 1;
+  font-size: 12px;
+  margin-top: -4px;
+}
+
+.ent-filter-toggle:hover {
+  color: #1677ff;
+}
+
+/* ========== 企业线索洞察 - 分析评价抽屉 ========== */
+/* 历史分析评价条目的删除按钮：默认灰色，hover 变红带浅红背景，点击加深 */
+.ent-eval-delete {
+  position: absolute;
+  top: -2px;
+  right: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: #bfbfbf;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all .2s;
+}
+
+.ent-eval-delete:hover {
+  color: #ff4d4f;
+  background: #fff1f0;
+}
+
+.ent-eval-delete:active {
+  color: #d9363e;
+  background: #ffccc7;
+}
+
+/* 结果标题 */
+.ent-result-panel {
+  padding: 16px 24px 0;
+}
+
+.ent-result-count {
+  margin-bottom: 4px;
+}
+
+.ent-result-count-num {
+  color: #1677ff;
+  font-weight: 600;
+}
+
+.ent-result-empty {
+  padding: 48px 0;
+}
+
+.ent-result-list {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 结果卡片 */
+.ent-card {
+  padding: 18px 0;
+  border-top: 1px solid #f0f0f0;
+  transition: background .2s;
+}
+
+.ent-card:first-child {
+  border-top: none;
+}
+
+.ent-card:hover {
+  background: #fafcff;
+}
+
+.ent-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.ent-card-logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ent-card-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.ent-card-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.ent-card-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1677ff;
+  cursor: pointer;
+}
+
+.ent-card-name:hover {
+  text-decoration: underline;
+}
+
+.ent-card-tags {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ent-card-tag {
+  font-size: 12px;
+  line-height: 20px;
+  padding: 0 6px;
+  border-radius: 2px;
+  border: 1px solid transparent;
+}
+
+.ent-card-tag-green {
+  color: #52c41a;
+  background: #f6ffed;
+  border-color: #b7eb8f;
+}
+
+.ent-card-tag-blue {
+  color: #1677ff;
+  background: #e6f4ff;
+  border-color: #91caff;
+}
+
+/* 卡片信息区：4 列栅格 */
+.ent-card-fields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px 24px;
+  margin-bottom: 8px;
+}
+
+.ent-card-field {
+  display: flex;
+  align-items: baseline;
+  font-size: 13px;
+  line-height: 24px;
+  min-width: 0;
+}
+
+.ent-card-field-full {
+  grid-column: span 2;
+}
+
+.ent-card-field-label {
+  color: #8c8c8c;
+  flex-shrink: 0;
+}
+
+.ent-card-field-value {
+  color: #333;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ent-card-field-value a {
+  color: #1677ff;
+}
+
+.ent-card-addr {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 动态标签 */
+.ent-card-dyn {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 24px;
+}
+
+.ent-card-dyn-label {
+  color: #8c8c8c;
+  flex-shrink: 0;
+}
+
+.ent-card-dyn-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ent-card-dyn-tag {
+  display: inline-block;
+  padding: 0 6px;
+  font-size: 12px;
+  line-height: 20px;
+  color: #1677ff;
+  background: #e6f4ff;
+  border: 1px solid #91caff;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+
+/* ========== 企业线索洞察 - 收藏/评价企业列表 ========== */
+/* 最新分析评价行：浅蓝高亮块 + 蓝色左边框，单行省略，hover 气泡查看全文 */
+.ent-card-eval {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 22px;
+  margin-top: 10px;
+  padding: 6px 12px;
+  background: #f0f7ff;
+  border-left: 3px solid #1677ff;
+  border-radius: 0 4px 4px 0;
+}
+
+.ent-card-eval-label {
+  flex-shrink: 0;
+  color: #1677ff;
+  font-weight: 500;
+}
+
+.ent-card-eval-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #595959;
+}
+
+.ent-card-eval-meta {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #bfbfbf;
+}
+
+/* ========== 企业线索洞察 - 热门产业榜单 ========== */
+/* 榜单行：排名 + 产业名 + 条形 + 热度分 + 环比变化 */
+.hot-rank-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  font-size: 13px;
+}
+
+.hot-rank-no {
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+  font-weight: 600;
+  font-style: italic;
+  color: #bfbfbf;
+  font-variant-numeric: tabular-nums;
+}
+
+.hot-rank-no.top1 { color: #f5222d; }
+.hot-rank-no.top2 { color: #fa8c16; }
+.hot-rank-no.top3 { color: #e6a010; }
+
+.hot-rank-name {
+  flex-shrink: 0;
+  width: 92px;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 本区已有产业：外层固定宽度对齐条形图，内层文字绿色系 + 流光动效 */
+.hot-rank-name.local {
+  /* 继承 .hot-rank-name 固定 92px，保证条形图左侧对齐 */
+}
+.hot-rank-name-text {
+  position: relative;
+  display: inline-block;
+}
+.hot-rank-name.local .hot-rank-name-text {
+  font-weight: 700;
+  background: linear-gradient(
+    90deg,
+    #237804 0%,
+    #389e0d 25%,
+    #1677ff 45%,
+    #52c41a 60%,
+    #237804 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: hot-rank-shine 3s linear infinite;
+}
+@keyframes hot-rank-shine {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+.hot-rank-name.local .hot-rank-name-text::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -3px;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(82, 196, 26, 0.9), rgba(255, 255, 255, 0));
+}
+
+.hot-rank-bar-track {
+  flex: 1;
+  min-width: 0;
+  height: 8px;
+  background: #f0f0f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.hot-rank-bar {
+  height: 100%;
+  border-radius: 4px;
+}
+
+.hot-rank-score {
+  flex-shrink: 0;
+  width: 42px;
+  text-align: right;
+  font-weight: 600;
+  color: #262626;
+  font-variant-numeric: tabular-nums;
+}
+
+.hot-rank-change {
+  flex-shrink: 0;
+  width: 52px;
+  text-align: right;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hot-rank-change.up { color: #f5222d; }
+.hot-rank-change.down { color: #52c41a; }
+.hot-rank-change.flat { color: #bfbfbf; }
+
+/* 产业热门资讯行 */
+.hot-news-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 0;
+  border-bottom: 1px dashed #f0f0f0;
+  font-size: 13px;
+}
+
+.hot-news-item:last-child {
+  border-bottom: none;
+}
+
+.hot-news-dot {
+  flex-shrink: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #1677ff;
+}
+
+.hot-news-title {
+  flex: 1;
+  min-width: 0;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hot-news-meta {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #bfbfbf;
+}
+
+/* 数据来源说明脚注 */
+.hot-meta-footer {
+  padding: 14px 4px 0;
+  font-size: 12px;
+  color: #bfbfbf;
+}
+
+/* ========== 榜单规则配置 ========== */
+/* 顶部配置操作行：左侧当前规则摘要 + 右侧配置按钮 */
+.hot-rank-config-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.hot-rank-config-tip {
+  font-size: 12px;
+  color: #8c8c8c;
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  border-radius: 4px;
+  padding: 4px 10px;
+}
+/* 配置抽屉：本区重点产业勾选组（13 个产业多行排列） */
+.rank-cfg-keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 0;
+}
+.rank-cfg-keywords .ant-checkbox-wrapper {
+  margin-inline-start: 0;
+  width: 33.3%;
+}
+/* 资讯面板空态（未勾选任何本区重点产业时） */
+.hot-news-empty {
+  padding: 40px 0;
+  text-align: center;
+  font-size: 13px;
+  color: #bfbfbf;
+}
+
+/* ========== 热度趋势图例（自绘，支持淡出产业置灰） ========== */
+.trend-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  padding: 8px 4px 6px;
+}
+
+.trend-legend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #595959;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.trend-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* 未勾选：整体淡化 */
+.trend-legend-chip.off {
+  color: #c0c4cc;
+}
+
+.trend-legend-chip.off .trend-legend-dot {
+  opacity: 0.35;
+}
+
+/* 已淡出产业：名称置灰 */
+.trend-legend-chip.faded:not(.off) {
+  color: #bfbfbf;
+}
+
+@media (max-width: 1280px) {
+  .ent-card-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 /* 表格蓝色表头样式 */
 .ant-table-thead > tr > th {
   background: #e6f4ff !important;
@@ -247,3 +1247,326 @@ body {
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
+
+/* ===== 产业研报 rpt-* 系列 ===== */
+
+/* 三栏布局（全屏，不走 MainLayout） */
+.rpt-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #f5f7fb;
+  overflow: hidden;
+}
+
+/* 通栏头部 */
+.rpt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  height: 56px;
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
+  flex-shrink: 0;
+}
+.rpt-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+.rpt-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.rpt-auto-save-tip {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-right: 4px;
+}
+
+/* 主体区：左栏 + 中栏 + 右栏 */
+.rpt-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* 左栏：研报列表 */
+.rpt-sidebar-left {
+  width: 200px;
+  flex-shrink: 0;
+  background: #fff;
+  border-right: 1px solid #f0f0f0;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+}
+.rpt-sidebar-list {
+  flex: 1;
+  overflow-y: auto;
+}
+.rpt-sidebar-item {
+  padding: 8px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-bottom: 2px;
+  transition: background 0.2s;
+}
+.rpt-sidebar-item:hover {
+  background: #f5f5f5;
+}
+.rpt-sidebar-item.active {
+  background: #e6f4ff;
+  border-left: 3px solid #1677ff;
+  padding-left: 7px;
+}
+.rpt-sidebar-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: #262626;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rpt-sidebar-meta {
+  font-size: 11px;
+  color: #bfbfbf;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 中栏 */
+.rpt-editor-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+.rpt-editor-topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  height: 56px;
+  flex-shrink: 0;
+}
+.rpt-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 24px;
+  border-bottom: 1px solid #f0f0f0;
+  flex-shrink: 0;
+}
+
+/* 富文本编辑器 */
+.rpt-editor {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  background: #fff;
+}
+.rpt-editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  flex-shrink: 0;
+}
+.rpt-editor-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 24px;
+  font-size: 14px;
+  line-height: 1.8;
+  outline: none;
+}
+.rpt-editor-body:focus {
+  outline: none;
+}
+.rpt-editor-body:empty::before {
+  content: attr(data-placeholder);
+  color: #bfbfbf;
+}
+.rpt-editor-body h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 16px 0 8px;
+  color: #262626;
+}
+.rpt-editor-body h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 12px 0 6px;
+  color: #262626;
+}
+.rpt-editor-body p {
+  margin: 6px 0;
+}
+.rpt-editor-body ul,
+.rpt-editor-body ol {
+  padding-left: 28px;
+  margin: 6px 0;
+}
+.rpt-editor-body table {
+  border-collapse: collapse;
+  margin: 8px 0;
+}
+
+/* 右栏 AI 对话区 */
+.rpt-ai-panel {
+  width: 520px;
+  flex-shrink: 0;
+  background: #fff;
+  border-left: 1px solid #f0f0f0;
+  display: flex;
+  flex-direction: column;
+}
+.rpt-ai-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  flex-shrink: 0;
+}
+.rpt-ai-messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+}
+.rpt-ai-empty {
+  text-align: center;
+  padding: 40px 16px;
+  color: #bfbfbf;
+}
+.rpt-ai-empty-icon {
+  width: 48px;
+  height: 48px;
+  line-height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1677ff, #4096ff);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 auto 12px;
+}
+.rpt-ai-empty-text {
+  font-size: 13px;
+  line-height: 1.8;
+}
+.rpt-msg {
+  margin-bottom: 12px;
+  display: flex;
+}
+.rpt-msg-user {
+  justify-content: flex-end;
+}
+.rpt-msg-ai {
+  justify-content: flex-start;
+}
+.rpt-msg-bubble {
+  max-width: 88%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.7;
+  word-break: break-word;
+}
+.rpt-msg-user .rpt-msg-bubble {
+  background: #e6f4ff;
+  color: #1677ff;
+}
+.rpt-msg-ai .rpt-msg-bubble {
+  background: #f5f5f5;
+  color: #333;
+}
+.rpt-ai-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 14px;
+  background: #1677ff;
+  margin-left: 2px;
+  vertical-align: middle;
+  animation: rpt-cursor-blink 0.8s infinite;
+}
+@keyframes rpt-cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.rpt-ai-apply {
+  text-align: center;
+  padding: 4px 0 12px;
+}
+.rpt-ai-input {
+  padding: 8px 12px 12px;
+  flex-shrink: 0;
+}
+/* 会话框：输入区 + 底部工具栏一体化，外层圆角边框，内部无分割 */
+.rpt-ai-input-box {
+  border: 1px solid #d9d9d9;
+  border-radius: 12px;
+  background: #fff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.rpt-ai-input-box:focus-within {
+  border-color: #1677ff;
+}
+.rpt-ai-input-box .ant-input {
+  resize: none;
+  padding: 10px 14px 4px;
+  font-size: 14px;
+  line-height: 1.6;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+/* antd v6 borderless 在 :focus-visible 时会加 outline 描边，需清除以保持会话框一体 */
+.rpt-ai-input-box .ant-input:hover,
+.rpt-ai-input-box .ant-input:focus,
+.rpt-ai-input-box .ant-input:focus-visible,
+.rpt-ai-input-box .ant-input-focused {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+.rpt-ai-input-box .ant-input::placeholder {
+  color: #bfbfbf;
+}
+.rpt-ai-input-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 10px 8px;
+}
+.rpt-ai-attach-btn {
+  color: #8c8c8c !important;
+  font-size: 13px;
+  padding: 4px 8px;
+}
+.rpt-ai-attach-btn:hover {
+  color: #1677ff !important;
+  background: transparent !important;
+}
+.rpt-ai-send-btn {
+  width: 32px;
+  height: 32px;
+  box-shadow: 0 2px 6px rgba(22, 119, 255, 0.3);
+}
+

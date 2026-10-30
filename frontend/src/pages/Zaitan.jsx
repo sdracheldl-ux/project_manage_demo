@@ -35,6 +35,7 @@ import {
   ExclamationCircleOutlined,
 } from '@ant-design/icons'
 import mockData from '../mock/data.json'
+import { getDecisionNodes } from '../components/DecisionFlow'
 import UpdateDecisionModal from '../components/UpdateDecisionModal'
 import ZaitanEditModal from '../components/ZaitanEditModal'
 import AssignModal from '../components/AssignModal'
@@ -52,6 +53,8 @@ const ALL_COLUMNS = [
   { key: 'reporter', title: '申报人', dataIndex: 'reporter', width: 130, align: 'left', fixed: 'left', ellipsis: true },
   { key: 'projectName', title: '项目名称', dataIndex: 'projectName', width: 220, ellipsis: true, required: true },
   { key: 'projectCategory', title: '项目分类', dataIndex: 'projectCategory', width: 85, align: 'center' },
+  { key: 'currentNode', title: '当前节点', dataIndex: 'currentNode', width: 100, align: 'center',
+    render: v => <Tag color={v === '不涉及' ? 'default' : 'processing'}>{v}</Tag> },
   { key: 'needInvestAmount', title: '需投资金额(亿元)', dataIndex: 'needInvestAmount', width: 130, align: 'right' },
   { key: 'sourceArea', title: '来源地', dataIndex: 'sourceArea', width: 100, ellipsis: true },
   { key: 'domesticForeign', title: '内外资', dataIndex: 'domesticForeign', width: 70, align: 'center' },
@@ -110,6 +113,7 @@ export default function Zaitan() {
     chushangType: undefined,
     domesticForeign: undefined,
     projectCategory: undefined,
+    currentNode: undefined,
     minAmount: undefined,
     maxAmount: undefined,
     dateRange: null,
@@ -169,6 +173,14 @@ export default function Zaitan() {
         responsibleUnits: normalizeResponsibleUnits(item['责任单位']).length
           ? normalizeResponsibleUnits(item['责任单位'])
           : [RESPONSIBLE_UNIT_OPTIONS[idx % RESPONSIBLE_UNIT_OPTIONS.length]],
+        // 当前节点：根据项目分类和投资额获取节点序列，按idx模拟当前推进节点
+        currentNode: (() => {
+          const nodes = getDecisionNodes(projectCategory, item['投资金额（亿元）'] || 0)
+          if (!nodes || nodes.length === 0) return '不涉及'
+          // 按idx模拟推进进度
+          const step = idx % nodes.length
+          return nodes[step].label
+        })(),
       }
     })
   }, [])
@@ -182,6 +194,7 @@ export default function Zaitan() {
       if (filters.category && r.industryCategory !== filters.category) return false
       if (filters.domesticForeign && r.domesticForeign !== filters.domesticForeign) return false
       if (filters.projectCategory && r.projectCategory !== filters.projectCategory) return false
+      if (filters.currentNode && r.currentNode !== filters.currentNode) return false
       if (filters.isOverflow && r.isOverflow !== filters.isOverflow) return false
       if (Array.isArray(filters.responsibleUnits) && filters.responsibleUnits.length > 0) {
         const units = r.responsibleUnits || []
@@ -447,8 +460,11 @@ export default function Zaitan() {
             allowClear
           />
           <Select placeholder="项目分类" {...selectCommon} style={{ width: fw }}
-            value={filters.projectCategory} onChange={(v) => setFilters({ ...filters, projectCategory: v })}
+            value={filters.projectCategory} onChange={(v) => setFilters({ ...filters, projectCategory: v, currentNode: undefined })}
             options={['政策类', '投资类', '供地类', '其他'].map(v => ({ label: v, value: v }))} />
+          <Select placeholder="当前节点" {...selectCommon} style={{ width: fw }}
+            value={filters.currentNode} onChange={(v) => setFilters({ ...filters, currentNode: v })}
+            options={['国企投决会', '投委会', '常务会', '供地会', '不涉及'].map(v => ({ label: v, value: v }))} />
           <Select placeholder="产业类别" {...selectCommon} style={{ width: fw }}
             value={filters.category} onChange={(v) => setFilters({ ...filters, category: v })}
             options={industryCategoryOptions} />

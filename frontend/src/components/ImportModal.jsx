@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Modal, Button, Upload, Steps, Tag, message } from 'antd'
 import {
   InboxOutlined,
   DownloadOutlined,
   CheckCircleFilled,
-  RightOutlined,
   ImportOutlined,
   FileExcelOutlined,
 } from '@ant-design/icons'
@@ -22,7 +20,6 @@ const IMPORT_STEPS = [
 const STEP_MS = [600, 700, 1000, 700]
 
 export default function ImportModal({ open, stage, stageLabel, onCancel }) {
-  const navigate = useNavigate()
   const { role } = useViewRole()
   const [phase, setPhase] = useState('upload') // upload | processing | done
   const [currentStep, setCurrentStep] = useState(0)
@@ -78,17 +75,11 @@ export default function ImportModal({ open, stage, stageLabel, onCancel }) {
     msgStore.addMessage({
       toDeptKey: role.deptKey,
       title: '【导入判重提醒】',
-      content: `您导入的「${fileName || '项目清单'}」已处理完成：成功入库 ${res.summary.success} 条，疑似重复 ${res.summary.duplicate} 条已转入研判池（${levelText}），跳过 ${res.summary.skipped} 条。请前往"项目重复研判"查看比对详情。`,
+      content: `您导入的「${fileName || '项目清单'}」已处理完成：成功入库 ${res.summary.success} 条，疑似重复 ${res.summary.duplicate} 条已转入研判池（${levelText}），跳过 ${res.summary.skipped} 条。疑似重复记录将由投促局统一研判处理，研判结果请注意关注。`,
       type: 'import',
-      link: '/project/yanpan',
     })
     setResult(res)
     setPhase('done')
-  }
-
-  const goToYanpan = (detailId) => {
-    onCancel()
-    navigate(detailId ? `/project/yanpan/detail/${detailId}` : '/project/yanpan')
   }
 
   const levelTag = (lv) => {
@@ -176,7 +167,7 @@ export default function ImportModal({ open, stage, stageLabel, onCancel }) {
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 8 }}>
             疑似重复明细
-            <span style={{ fontWeight: 400, color: '#8c8c8c', marginLeft: 8 }}>已转入研判池待人工决策，点击可查看比对详情</span>
+            <span style={{ fontWeight: 400, color: '#8c8c8c', marginLeft: 8 }}>已转入研判池，由投促局统一研判处理</span>
           </div>
           {conflicts.map(c => (
             <div
@@ -185,15 +176,10 @@ export default function ImportModal({ open, stage, stageLabel, onCancel }) {
                 display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
                 padding: '8px 12px', background: '#fafafa',
                 border: '1px solid #f0f0f0', borderRadius: 4, marginBottom: 6,
-                cursor: 'pointer', transition: 'all 0.2s',
               }}
-              onClick={() => goToYanpan(c.id)}
-              onMouseEnter={(e) => e.currentTarget.style.borderColor = '#1677ff'}
-              onMouseLeave={(e) => e.currentTarget.style.borderColor = '#f0f0f0'}
             >
               {levelTag(c.conflictLevel)}
               <span style={{ fontWeight: 500 }}>{c.newProjectName}</span>
-              <RightOutlined style={{ fontSize: 11, color: '#bfbfbf' }} />
               <span style={{ color: '#595959' }}>命中：{c.existingProjectName}</span>
               <span style={{ fontSize: 12, color: '#bfbfbf' }}>（{c.existingStage}）</span>
             </div>
@@ -213,18 +199,11 @@ export default function ImportModal({ open, stage, stageLabel, onCancel }) {
     )
   }
 
-  // ===== 底部按钮 =====
+  // ===== 底部按钮（导入方为园区人员，仅查看不处理，无需跳转研判池入口） =====
   const renderFooter = () => {
     if (phase === 'upload') return [<Button key="cancel" onClick={onCancel}>取消</Button>]
     if (phase === 'processing') return null
-    return [
-      <Button key="done" onClick={onCancel}>完成</Button>,
-      result && result.summary.duplicate > 0 && (
-        <Button key="go" type="primary" icon={<RightOutlined />} onClick={() => goToYanpan()}>
-          去研判池处理
-        </Button>
-      ),
-    ].filter(Boolean)
+    return [<Button key="done" type="primary" onClick={onCancel}>完成</Button>]
   }
 
   return (

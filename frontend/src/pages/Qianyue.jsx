@@ -14,6 +14,7 @@ import GenericProjectList from '../components/GenericProjectList'
 import QianyueEditModal from '../components/QianyueEditModal'
 import ZhuanLuodiModal from '../components/ZhuanLuodiModal'
 import ImportModal from '../components/ImportModal'
+import TransferQianyueModal from '../components/TransferQianyueModal'
 import mockData from '../mock/data.json'
 import {
   RESPONSIBLE_UNIT_SELECT_GROUPS,
@@ -22,7 +23,7 @@ import {
   CITY_CODE_SEEDS,
   DISTRICT_CODE_SEEDS,
 } from '../constants/projectEnums'
-import { useViewRole, useImported, msgStore, tuikuAuditStore, useTuikuAuditStore } from '../store/viewStore'
+import { useViewRole, useImported, msgStore, tuikuAuditStore, useTuikuAuditStore, useTransferStore } from '../store/viewStore'
 import {
   COLORS,
   actionLinkStyle,
@@ -74,6 +75,10 @@ export default function Qianyue() {
   const [tuikuVisible, setTuikuVisible] = useState(false)
   const [tuikuRecord, setTuikuRecord] = useState(null)
   const [tuikuReason, setTuikuReason] = useState('')
+  // 移交
+  useTransferStore()
+  const [transferVisible, setTransferVisible] = useState(false)
+  const [transferRecord, setTransferRecord] = useState(null)
 
   const dataList = useMemo(() => {
     // Excel导入成功的项目置顶展示；审核通过（已退库）的项目从列表移除
@@ -217,6 +222,7 @@ export default function Qianyue() {
           { key: 'report', icon: <FileTextOutlined />, label: '进展汇报' },
           ...(tuikuPending ? [] : [
             { key: 'edit', icon: <EditOutlined />, label: '编辑' },
+            { key: 'transfer', icon: <ExportOutlined />, label: '移交' },
             { key: 'tuiku', icon: <PauseCircleOutlined style={{ color: '#ff4d4f' }} />, label: '标记退库', danger: true },
           ]),
         ]
@@ -224,6 +230,7 @@ export default function Qianyue() {
           if (e.key === 'edit') handleEdit(record)
           else if (e.key === 'report') handleReport(record)
           else if (e.key === 'tuiku') { setTuikuRecord(record); setTuikuReason(''); setTuikuVisible(true) }
+          else if (e.key === 'transfer') { setTransferRecord(record); setTransferVisible(true) }
         }
         return (
           <Space size={0} split={<Divider type="vertical" style={{ margin: '0 8px' }} />}>
@@ -320,6 +327,14 @@ export default function Qianyue() {
           </Form.Item>
         </Form>
       </Modal>
+
+      {/* 移交弹窗 */}
+      <TransferQianyueModal
+        open={transferVisible}
+        projectData={transferRecord}
+        onCancel={() => { setTransferVisible(false); setTransferRecord(null) }}
+        onOk={() => { setTransferVisible(false); setTransferRecord(null) }}
+      />
 
       {/* 退库申请弹窗（提交后需投促局审核） */}
       <Modal

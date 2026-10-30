@@ -17,7 +17,8 @@ import QianyueEditModal from '../components/QianyueEditModal'
 import ZhuanLuodiModal from '../components/ZhuanLuodiModal'
 import ProgressTimeline from '../components/ProgressTimeline'
 import ProgressSummaryModal from '../components/ProgressSummaryModal'
-import { useViewRole, msgStore, tuikuAuditStore, useTuikuAuditStore } from '../store/viewStore'
+import TransferQianyueModal from '../components/TransferQianyueModal'
+import { useViewRole, msgStore, tuikuAuditStore, useTuikuAuditStore, useTransferStore } from '../store/viewStore'
 import { findUnitByKey } from '../constants/assignConfig'
 import {
   RESPONSIBLE_UNIT_OPTIONS,
@@ -145,6 +146,9 @@ export default function QianyueDetail() {
   const tuikuPending = tuikuAuditStore.hasPending(id)
   const [tuikuVisible, setTuikuVisible] = useState(false)
   const [tuikuReason, setTuikuReason] = useState('')
+  // 移交
+  useTransferStore()
+  const [transferVisible, setTransferVisible] = useState(false)
 
   // 从审核store派生退库申请/审核系统记录（含驳回意见），保证详情进展与审核状态同步
   const tuikuProgress = useMemo(() => {
@@ -485,6 +489,7 @@ export default function QianyueDetail() {
                 {!tuikuPending && (
                   <>
                     <Button icon={<EditOutlined />} onClick={() => setEditModalVisible(true)}>编辑</Button>
+                    <Button icon={<ExportOutlined />} onClick={() => setTransferVisible(true)}>移交</Button>
                     <Button icon={<ExportOutlined />} onClick={handleToLuodi}>推进落地</Button>
                   </>
                 )}
@@ -731,6 +736,14 @@ export default function QianyueDetail() {
         projectName={project.projectName}
         onCancel={() => setAssignModalVisible(false)}
         onOk={handleAssign}
+      />
+
+      {/* 移交弹窗 */}
+      <TransferQianyueModal
+        open={transferVisible}
+        projectData={project}
+        onCancel={() => setTransferVisible(false)}
+        onOk={() => setTransferVisible(false)}
       />
 
       {/* 反馈弹窗 */}

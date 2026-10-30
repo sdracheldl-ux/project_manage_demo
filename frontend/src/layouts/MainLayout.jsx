@@ -24,6 +24,12 @@ import {
   FieldTimeOutlined,
   NotificationOutlined,
   IdcardOutlined,
+  BuildOutlined,
+  ApartmentOutlined,
+  CompassOutlined,
+  ScanOutlined,
+  StarOutlined,
+  TrophyOutlined,
 } from '@ant-design/icons'
 import { useViewRole, useMessages } from '../store/viewStore'
 import { VIEW_ROLES } from '../constants/assignConfig'
@@ -36,8 +42,18 @@ const menuItems = [
     icon: <DashboardOutlined />,
     label: '统计看板',
     children: [
-      { key: '/dashboard/project', icon: <PieChartOutlined />, label: '项目统计分析' },
-      { key: '/dashboard/perf', icon: <LineChartOutlined />, label: '绩效维度看板' },
+      { key: '/dashboard/project', icon: <PieChartOutlined />, label: '统计看板' },
+    ],
+  },
+  {
+    key: 'intelligence',
+    icon: <CompassOutlined />,
+    label: '产业情报',
+    children: [
+      { key: '/intelligence/enterprise', icon: <ScanOutlined />, label: '企业线索洞察' },
+      { key: '/intelligence/enterprise/favorites', icon: <StarOutlined />, label: '关注企业' },
+      { key: '/intelligence/reports', icon: <FileTextOutlined />, label: '产业研报' },
+      { key: '/intelligence/enterprise/rankings', icon: <TrophyOutlined />, label: '热点榜单' },
     ],
   },
   {
@@ -58,7 +74,9 @@ const menuItems = [
     icon: <BarChartOutlined />,
     label: '绩效考核',
     children: [
-      { key: '/performance', icon: <PullRequestOutlined />, label: '绩效考核' },
+      { key: '/performance/park', icon: <BuildOutlined />, label: '园区考核' },
+      { key: '/performance/soe', icon: <ApartmentOutlined />, label: '国企考核' },
+      { key: '/performance/dept', icon: <TeamOutlined />, label: '部门考核' },
     ],
   },
   {
@@ -86,9 +104,17 @@ const breadcrumbMap = {
   '/project/luodi': ['项目全生命周期管理', '项目落地'],
   '/project/yanpan': ['项目全生命周期管理', '项目重复研判'],
   '/project/tuiku': ['项目全生命周期管理', '项目退库'],
-  '/performance': ['绩效考核', '绩效考核'],
-  '/dashboard/project': ['统计看板', '项目统计分析'],
-  '/dashboard/perf': ['统计看板', '绩效维度看板'],
+  '/performance/park': ['绩效考核', '园区考核'],
+  '/performance/soe': ['绩效考核', '国企考核'],
+  '/performance/dept': ['绩效考核', '部门考核'],
+  '/dashboard/project': ['统计看板'],
+  '/dashboard/perf': ['统计看板'],
+  '/intelligence/enterprise': ['产业情报', '企业线索洞察'],
+  '/intelligence/enterprise/favorites': ['产业情报', '关注企业'],
+  '/intelligence/enterprise/rankings': ['产业情报', '热点榜单'],
+  '/intelligence/reports': ['产业情报', '产业研报'],
+  '/intelligence/reports/edit': ['产业情报', '产业研报', '研报编辑'],
+  '/intelligence/enterprise/detail': ['产业情报', '企业线索洞察', '企业详情'],
   '/system/account': ['系统管理', '账号管理'],
   '/system/role': ['系统管理', '角色管理'],
   '/system/log': ['系统管理', '日志管理'],
@@ -112,19 +138,35 @@ export default function MainLayout() {
     return location.pathname
   }, [location.pathname, location.hash])
 
-  const currentOpenKeys = useMemo(() => {
-    for (const item of menuItems) {
-      if (item.children?.some(c => realPath.startsWith(c.key))) {
-        const set = new Set([...openKeys, item.key])
-        return Array.from(set)
+  // 递归查找路径命中的菜单项（取最长匹配，保证更具体的路由优先）及其父级菜单 key
+  const findMenuMatch = (items, ancestors = []) => {
+    let best = null
+    for (const item of items) {
+      const nextAncestors = [...ancestors, item.key]
+      if (item.key?.startsWith('/') && realPath.startsWith(item.key)) {
+        if (!best || item.key.length > best.key.length) {
+          best = { key: item.key, parents: ancestors.filter((k) => !k.startsWith('/')) }
+        }
+      }
+      if (item.children) {
+        const nested = findMenuMatch(item.children, nextAncestors)
+        if (nested && (!best || nested.key.length > best.key.length)) best = nested
       }
     }
+    return best
+  }
+
+  const currentOpenKeys = useMemo(() => {
+    const match = findMenuMatch(menuItems)
+    if (match) return Array.from(new Set([...openKeys, ...match.parents]))
     return openKeys
   }, [realPath, openKeys])
 
   const getBreadcrumbKey = (path) => {
     if (path.startsWith('/project/mouhua/detail')) return '/project/mouhua/detail'
     if (path.startsWith('/project/zaitan/detail')) return '/project/zaitan/detail'
+    if (path.startsWith('/intelligence/enterprise/detail')) return '/intelligence/enterprise/detail'
+    if (path.startsWith('/intelligence/reports/edit')) return '/intelligence/reports/edit'
     return path
   }
 
@@ -149,6 +191,14 @@ export default function MainLayout() {
     if (path.startsWith('/project/tuiku')) return '/project/tuiku'
     if (path.startsWith('/dashboard/project')) return '/dashboard/project'
     if (path.startsWith('/dashboard/perf')) return '/dashboard/perf'
+    if (path.startsWith('/intelligence/enterprise/favorites')) return '/intelligence/enterprise/favorites'
+    if (path.startsWith('/intelligence/enterprise/rankings')) return '/intelligence/enterprise/rankings'
+    if (path.startsWith('/intelligence/reports')) return '/intelligence/reports'
+    if (path.startsWith('/intelligence/enterprise')) return '/intelligence/enterprise'
+    if (path.startsWith('/performance/park')) return '/performance/park'
+    if (path.startsWith('/performance/soe')) return '/performance/soe'
+    if (path.startsWith('/performance/dept')) return '/performance/dept'
+    if (path.startsWith('/performance')) return '/performance/park'
     if (path.startsWith('/system/')) {
       const matched = menuItems.find(m => m.key === 'system').children.find(c => path.startsWith(c.key))
       return matched ? matched.key : path
@@ -230,24 +280,26 @@ export default function MainLayout() {
         >
           <Breadcrumb items={breadcrumbItems} style={{ fontSize: 13 }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {/* 视角切换按钮组 */}
-            <Segmented
-              value={role.isSponsor ? 'sponsor' : 'receiver'}
-              size="small"
-              options={[
-                { label: '发起人视角', value: 'sponsor' },
-                { label: '接收方视角', value: 'receiver' },
-              ]}
-              onChange={(val) => {
-                if (val === 'sponsor') {
-                  onViewRoleChange('sponsor')
-                } else {
-                  onViewRoleChange(receiverRoles[0].key)
-                }
-              }}
-              style={{ fontSize: 12 }}
-            />
-            {!role.isSponsor && receiverRoles.length > 1 && (
+            {/* 视角切换按钮组（绩效考核页面不显示） */}
+            {!realPath.startsWith('/performance') && (
+              <Segmented
+                value={role.isSponsor ? 'sponsor' : 'receiver'}
+                size="small"
+                options={[
+                  { label: '发起人视角', value: 'sponsor' },
+                  { label: '接收方视角', value: 'receiver' },
+                ]}
+                onChange={(val) => {
+                  if (val === 'sponsor') {
+                    onViewRoleChange('sponsor')
+                  } else {
+                    onViewRoleChange(receiverRoles[0].key)
+                  }
+                }}
+                style={{ fontSize: 12 }}
+              />
+            )}
+            {!role.isSponsor && receiverRoles.length > 1 && !realPath.startsWith('/performance') && (
               <Select
                 size="small"
                 value={role.key}

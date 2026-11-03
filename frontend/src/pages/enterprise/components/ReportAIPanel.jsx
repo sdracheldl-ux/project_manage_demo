@@ -1,22 +1,36 @@
-import { useState, useRef, useEffect } from 'react'
-import { Button, Input, Upload, message, Tooltip } from 'antd'
-import { SendOutlined, FileAddOutlined, PaperClipOutlined } from '@ant-design/icons'
-import { getMockTemplate } from '../../../constants/reportEnums'
+import { useState, useRef, useEffect, useMemo } from 'react'
+import { Button, Input, Upload, message } from 'antd'
+import { SendOutlined, FileAddOutlined, PaperClipOutlined, BookOutlined } from '@ant-design/icons'
+import { parseOutlineFromInput, getMockContentBlocks } from '../../../constants/reportEnums'
+import KnowledgeQuoteModal from './KnowledgeQuoteModal'
+import OutlineConfirmCard from './OutlineConfirmCard'
 
 /**
- * AI 对话区（mock 流式输出 + 附件上传）
- * 顶部：下载 / AI审核 / 保存按钮
- * 底部：附件上传 + 输入框 + 发送
+ * AI 对话区（mock 流式输出 + 附件上传 + 知识库引用）
+ * 流程：用户输入 → 智能体生成大纲（卡片，需确认）→ 流式生成正文 → 应用到编辑区
  */
 export default function ReportAIPanel({ report, chatHistory, onChatChange, onApplyHtml }) {
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
-  const [streamText, setStreamText] = useState('')
-  const [showApply, setShowApply] = useState(false)
+  const [streamHtml, setStreamHtml] = useState('')
+  const [applied, setApplied] = useState(false)
   const [messages, setMessages] = useState(chatHistory || [])
-  const [awaitingConfirm, setAwaitingConfirm] = useState(false)
+  const [kbModalOpen, setKbModalOpen] = useState(false)
+  const [quotedDocs, setQuotedDocs] = useState([])
   const streamTimer = useRef(null)
   const msgEndRef = useRef(null)
+  const messagesRef = useRef(messages)
+  const regenerateVariantRef = useRef(0)
+
+  // 最近一次生成的正文（从对话历史派生，刷新后仍可应用）
+  const lastBody = useMemo(
+    () => [...messages].reverse().find((m) => m.type === 'body'),
+    [messages]
+  )
+
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
 
   useEffect(() => {
     setMessages(chatHistory || [])
@@ -24,7 +38,7 @@ export default function ReportAIPanel({ report, chatHistory, onChatChange, onApp
 
   useEffect(() => {
     msgEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, streamText])
+  }, [messages, streamHtml])
 
   useEffect(() => {
     return () => {
@@ -32,64 +46,109 @@ export default function ReportAIPanel({ report, chatHistory, onChatChange, onApp
     }
   }, [])
 
-  const addMessage = (role, content) => {
-    const msg = { id: `msg-${Date.now()}-${Math.random()}`, role, content, time: Date.now() }
-    const next = [...messages, msg]
+  /** 写入消息并同步给父级 */
+  const commit = (next) => {
+    messagesRef.current = next
     setMessages(next)
     onChatChange?.(next)
-    return next
   }
 
-  const mockStream = (text, onDone) => {
+  /**
+   * 生成大纲卡片
+   * 用户给定了「第X部分」结构则遵循用户结构，否则使用基础大纲
+   */
+  const generateOutline = (sourceText, replaceId, variant = 0) => {
+    const sections = parseOutlineFromInput(sourceText, variant)
+    const outlineMsg = {
+      id: replaceId || `msg-${Date.now()}-${Math.random()}`,
+      role: 'assistant',
+      type: 'outline',
+      content: '已解析您的撰写需求，生成以下大纲，请确认后开始撰写：',
+      source: sourceText,
+      outline: { sections, status: 'pending' },
+      time: Date.now(),
+    }
+    const list = messagesRef.current
+    if (replaceId) {
+      commit(list.map((m) => (m.id === replaceId ? { ...m, ...outlineMsg, id: replaceId } : m)))
+    } else {
+      commit([...list, outlineMsg])
+    }
+  }
+
+  /** 逐部分流式输出正文 */
+  const streamBlocks = (sections) => {
+    const blocks = getMockContentBlocks(sections)
     setStreaming(true)
-    setStreamText('')
+    setStreamHtml('')
     let i = 0
+    let acc = ''
     streamTimer.current = setInterval(() => {
-      const step = Math.max(3, Math.floor(Math.random() * 12))
-      i += step
-      setStreamText(text.slice(0, i))
-      if (i >= text.length) {
+      if (i >= blocks.length) {
         clearInterval(streamTimer.current)
         streamTimer.current = null
         setStreaming(false)
-        onDone?.(text)
+        setStreamHtml('')
+        setApplied(false)
+        commit([
+          ...messagesRef.current,
+          {
+            id: `msg-${Date.now()}-${Math.random()}`,
+            role: 'assistant',
+            type: 'body',
+            content: acc,
+            time: Date.now(),
+          },
+        ])
+        message.success('正文已生成，可点击"应用到编辑区"')
+        return
       }
-    }, 30)
+      acc += blocks[i]
+      i += 1
+      setStreamHtml(acc)
+    }, 600)
   }
 
   const handleSend = () => {
     const text = input.trim()
     if (!text || streaming) return
 
-    addMessage('user', text)
+    commit([
+      ...messagesRef.current,
+      { id: `msg-${Date.now()}-${Math.random()}`, role: 'user', type: 'text', content: text, time: Date.now() },
+    ])
     setInput('')
 
-    if (awaitingConfirm) {
-      setAwaitingConfirm(false)
-      const mockHtml = getMockTemplate('quarterly', '', '')
-      setTimeout(() => {
-        mockStream(mockHtml, (full) => {
-          addMessage('assistant', full)
-          setShowApply(true)
-          message.success('研报内容已生成，可点击"应用到编辑区"')
-        })
-      }, 500)
-    } else {
-      setTimeout(() => {
-        const reply = `好的，我将根据您的需求生成研报内容。请确认以下信息：\n\n• 题目：${report?.title || '未设置'}\n• 撰写人：${report?.author || '未知'}\n\n回复"确认"开始生成，或修改需求后重新发送。`
-        addMessage('assistant', reply)
-        setAwaitingConfirm(true)
-      }, 500)
-    }
+    // 已有待确认的大纲时，新一轮输入视为对大纲的调整，就地替换
+    const list = messagesRef.current
+    const pending = [...list].reverse().find((m) => m.type === 'outline' && m.outline?.status !== 'confirmed')
+    setTimeout(() => generateOutline(text, pending?.id), 400)
+  }
+
+  /** 用户确认大纲 → 流式生成正文 */
+  const handleConfirmOutline = (msgId, sections) => {
+    commit(
+      messagesRef.current.map((m) =>
+        m.id === msgId
+          ? { ...m, outline: { ...m.outline, sections, status: 'confirmed' } }
+          : m
+      )
+    )
+    setTimeout(() => streamBlocks(sections), 300)
+  }
+
+  /** 重新生成大纲 */
+  const handleRegenerateOutline = (msgId, source) => {
+    regenerateVariantRef.current += 1
+    generateOutline(source, msgId, regenerateVariantRef.current)
   }
 
   const handleApply = () => {
-    const lastAi = [...messages].reverse().find((m) => m.role === 'assistant')
-    if (lastAi) {
-      onApplyHtml?.(lastAi.content)
+    if (lastBody?.content) {
+      onApplyHtml?.(lastBody.content)
+      setApplied(true)
       message.success('已应用到编辑区')
     }
-    setShowApply(false)
   }
 
   const handleKeyDown = (e) => {
@@ -107,32 +166,69 @@ export default function ReportAIPanel({ report, chatHistory, onChatChange, onApp
     showUploadList: true,
   }
 
+  // 承接列表页带入的用户输入：自动触发一次大纲生成
+  useEffect(() => {
+    const list = messagesRef.current
+    const last = list[list.length - 1]
+    if (last && last.role === 'user') {
+      setTimeout(() => generateOutline(last.content), 500)
+    }
+    // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
+
   return (
     <div className="rpt-ai-panel">
       {/* 消息流 */}
       <div className="rpt-ai-messages">
         {messages.length === 0 && !streaming && (
           <div className="rpt-ai-empty">
-            <div className="rpt-ai-empty-icon">AI</div>
+            <img src="/研报助手-3.png" alt="研报助手" className="rpt-ai-empty-avatar" />
             <div className="rpt-ai-empty-text">
-              我是产业研报助手，输入您的需求即可开始生成研报内容。
+              Hi～我是产业研报助手，可协助您梳理产业数据，编写产业研究报告。
+              <br />
+              您可以将思路，如题目、基本介绍、各部分标题、要点发给我，可以帮助您写的更好哦~
             </div>
           </div>
         )}
         {messages.map((msg) => (
-          <div key={msg.id} className={`rpt-msg ${msg.role === 'user' ? 'rpt-msg-user' : 'rpt-msg-ai'}`}>
-            <div className="rpt-msg-bubble" dangerouslySetInnerHTML={{ __html: msg.content.replace(/\n/g, '<br/>') }} />
+          <div
+            key={msg.id}
+            className={`rpt-msg ${msg.role === 'user' ? 'rpt-msg-user' : 'rpt-msg-ai'}${
+              msg.type === 'outline' ? ' rpt-msg-col' : ''
+            }`}
+          >
+            {msg.type === 'outline' ? (
+              <>
+                <div className="rpt-msg-bubble rpt-msg-bubble-plain">{msg.content}</div>
+                <OutlineConfirmCard
+                  outline={msg.outline?.sections || []}
+                  status={msg.outline?.status}
+                  onConfirm={(sections) => handleConfirmOutline(msg.id, sections)}
+                  onRegenerate={() => handleRegenerateOutline(msg.id, msg.source)}
+                />
+              </>
+            ) : msg.type === 'body' ? (
+              <div
+                className="rpt-msg-bubble rpt-msg-bubble-stream"
+                dangerouslySetInnerHTML={{ __html: msg.content }}
+              />
+            ) : (
+              <div
+                className="rpt-msg-bubble"
+                dangerouslySetInnerHTML={{ __html: msg.content.replace(/\n/g, '<br/>') }}
+              />
+            )}
           </div>
         ))}
-        {streaming && (
+        {(streaming || streamHtml) && (
           <div className="rpt-msg rpt-msg-ai">
-            <div className="rpt-msg-bubble">
-              <span dangerouslySetInnerHTML={{ __html: streamText.replace(/\n/g, '<br/>') }} />
-              <span className="rpt-ai-cursor" />
+            <div className="rpt-msg-bubble rpt-msg-bubble-stream">
+              <span dangerouslySetInnerHTML={{ __html: streamHtml }} />
+              {streaming && <span className="rpt-ai-cursor" />}
             </div>
           </div>
         )}
-        {showApply && (
+        {lastBody && !applied && (
           <div className="rpt-ai-apply">
             <Button type="primary" icon={<FileAddOutlined />} onClick={handleApply}>
               应用到编辑区
@@ -149,17 +245,28 @@ export default function ReportAIPanel({ report, chatHistory, onChatChange, onApp
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={awaitingConfirm ? '回复"确认"开始生成...' : '问我任何问题吧！'}
+            placeholder="请输入您的撰写需求，如题目、各部分标题与要点..."
             autoSize={{ minRows: 2, maxRows: 5 }}
             disabled={streaming}
             variant="borderless"
           />
           <div className="rpt-ai-input-actions">
-            <Upload {...uploadProps}>
-              <Button type="text" size="small" icon={<PaperClipOutlined />} className="rpt-ai-attach-btn">
-                附件
+            <div className="rpt-ai-input-left">
+              <Upload {...uploadProps}>
+                <Button type="text" size="small" icon={<PaperClipOutlined />} className="rpt-ai-attach-btn">
+                  添加附件
+                </Button>
+              </Upload>
+              <Button
+                type="text"
+                size="small"
+                icon={<BookOutlined />}
+                className="rpt-ai-attach-btn"
+                onClick={() => setKbModalOpen(true)}
+              >
+                引用知识库
               </Button>
-            </Upload>
+            </div>
             <Button
               type="primary"
               shape="circle"
@@ -169,8 +276,41 @@ export default function ReportAIPanel({ report, chatHistory, onChatChange, onApp
               className="rpt-ai-send-btn"
             />
           </div>
+          {/* 已引用知识库文档 */}
+          {quotedDocs.length > 0 && (
+            <div className="rpt-ai-quoted">
+              {quotedDocs.map((d) => (
+                <span key={d.id} className="rpt-ai-quoted-tag">
+                  {d.name}
+                  <span
+                    className="rpt-ai-quoted-close"
+                    onClick={() => setQuotedDocs((prev) => prev.filter((x) => x.id !== d.id))}
+                  >
+                    ×
+                  </span>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* 引用知识库弹窗 */}
+      <KnowledgeQuoteModal
+        open={kbModalOpen}
+        onCancel={() => setKbModalOpen(false)}
+        onConfirm={(docs) => {
+          setQuotedDocs((prev) => {
+            const merged = [...prev]
+            docs.forEach((d) => {
+              if (!merged.some((x) => x.id === d.id)) merged.push(d)
+            })
+            return merged
+          })
+          setKbModalOpen(false)
+          message.success(`已引用 ${docs.length} 份知识库文档`)
+        }}
+      />
     </div>
   )
 }

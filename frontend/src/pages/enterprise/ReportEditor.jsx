@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Button, Input, message, Tooltip } from 'antd'
-import { ArrowLeftOutlined, DownloadOutlined, AuditOutlined, PlusOutlined } from '@ant-design/icons'
+import { Button, Input, message } from 'antd'
+import { ArrowLeftOutlined, DownloadOutlined, AuditOutlined, PlusOutlined, SaveOutlined } from '@ant-design/icons'
 import { COLORS } from '../../constants/uiStyles'
-import { getReport, upsertReport, getAllReports } from '../../utils/reportStore'
+import { getReport, upsertReport, getAllReports, genReportId } from '../../utils/reportStore'
 import RichTextEditor from './components/RichTextEditor'
 import ReportAIPanel from './components/ReportAIPanel'
 
@@ -93,6 +93,18 @@ export default function ReportEditor() {
     message.info('AI 审核功能开发中...')
   }
 
+  const handleSave = () => {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current)
+      saveTimer.current = null
+    }
+    if (reportRef.current) {
+      upsertReport(reportRef.current)
+      setAllReports(getAllReports())
+    }
+    message.success('研报已保存')
+  }
+
   const handleBack = () => {
     flushSave()
     navigate('/intelligence/reports')
@@ -105,12 +117,27 @@ export default function ReportEditor() {
 
   const handleNewReport = () => {
     flushSave()
-    navigate('/intelligence/reports')
+    const newId = genReportId()
+    const newReport = {
+      id: newId,
+      title: '',
+      content: '',
+      author: report?.author || '',
+      chatHistory: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }
+    upsertReport(newReport)
+    setReport(newReport)
+    setAllReports(getAllReports())
+    setTick((n) => n + 1)
+    navigate(`/intelligence/reports/edit/${newId}`, { replace: true })
   }
 
+  // 智能体输出为完整正文，重复应用时覆盖而非追加
   const handleApplyHtml = (html) => {
     setReport((prev) => {
-      const next = { ...prev, content: prev.content ? prev.content + html : html }
+      const next = { ...prev, content: html }
       debouncedSave(next)
       return next
     })
@@ -120,7 +147,6 @@ export default function ReportEditor() {
   const handleChatChange = (chatHistory) => {
     updateField('chatHistory', chatHistory)
   }
-
   if (!report) {
     return <div style={{ padding: 24, textAlign: 'center', color: COLORS.textMuted }}>加载中...</div>
   }
@@ -141,8 +167,9 @@ export default function ReportEditor() {
         </div>
         <div className="rpt-header-right">
           <span className="rpt-auto-save-tip">报告会自动保存，无需担心丢失</span>
-          <Button icon={<DownloadOutlined />} onClick={handleDownload}>下载</Button>
+          <Button icon={<SaveOutlined />} onClick={handleSave}>保存</Button>
           <Button icon={<AuditOutlined />} onClick={handleAIAudit}>AI审核</Button>
+          <Button type="primary" icon={<DownloadOutlined />} onClick={handleDownload}>下载</Button>
         </div>
       </div>
 
@@ -182,6 +209,7 @@ export default function ReportEditor() {
 
         {/* 右栏：AI 对话区 */}
         <ReportAIPanel
+          key={report.id}
           report={report}
           chatHistory={report.chatHistory}
           onChatChange={handleChatChange}

@@ -1,13 +1,24 @@
 import { useMemo, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Empty, Input, Upload, Table, message } from 'antd'
-import { InboxOutlined, SearchOutlined, EyeOutlined } from '@ant-design/icons'
+import { InboxOutlined, SearchOutlined, EyeOutlined, BookOutlined } from '@ant-design/icons'
 import { COLORS, sectionTitleStyle } from '../../constants/uiStyles'
 import { getAllReports, upsertReport, deleteReport } from '../../utils/reportStore'
 import { useViewRole } from '../../store/viewStore'
+import KnowledgeQuoteModal from './components/KnowledgeQuoteModal'
 
 const { TextArea } = Input
 const { Dragger } = Upload
+
+const CONTENT_PLACEHOLDER = `请输入研报正文内容，输入完成后点击下方按钮进入写作详情页...
+
+示例
+第一部分：[板块标题]；[要点1]；[要点2]
+第二部分：[板块标题]；[要点1]；[特殊要求，如"这里搞个表格对比"]
+第三部分：[板块标题]；[要点1]
+第四部分：光谷招商建议
+
+整体要求：行文正式，引用最新且真实的数据，篇幅约15页`
 
 /** 产业研报列表页：顶部对话输入区 + 下方历史研报列表 */
 export default function IndustryReports() {
@@ -17,6 +28,8 @@ export default function IndustryReports() {
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [tick, setTick] = useState(0)
+  const [kbModalOpen, setKbModalOpen] = useState(false)
+  const [quotedDocs, setQuotedDocs] = useState([])
 
   const reports = useMemo(() => getAllReports(), [tick])
 
@@ -31,16 +44,30 @@ export default function IndustryReports() {
   }, [reports, keyword])
 
   const handleEnterEditor = () => {
-    // 创建新研报草稿，带题目和正文进入编辑页
+    // 创建新研报草稿：题目写入标题，用户输入的内容作为右侧对话区的用户消息
+    // 富文本区留空，仅承载智能体输出的正文
+    const prompt = content.trim()
+    const chatHistory = prompt
+      ? [
+          {
+            id: `msg-${Date.now()}`,
+            role: 'user',
+            type: 'text',
+            content: prompt,
+            time: Date.now(),
+          },
+        ]
+      : []
     const newReport = {
       id: `rpt-${Date.now()}`,
       title: title.trim(),
       author: role?.userName || '',
       status: 'draft',
-      content: content.trim() ? `<p>${content.trim()}</p>` : '',
-      summary: content.trim().slice(0, 80),
+      content: '',
+      summary: prompt.slice(0, 80),
       attachments: [],
-      chatHistory: [],
+      quotedDocs,
+      chatHistory,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     }
@@ -107,19 +134,45 @@ export default function IndustryReports() {
         <TextArea
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          placeholder="请输入研报正文内容，输入完成后点击下方按钮进入写作详情页..."
-          autoSize={{ minRows: 4, maxRows: 8 }}
+          placeholder={CONTENT_PLACEHOLDER}
+          autoSize={{ minRows: 4, maxRows: 10 }}
           style={{ fontSize: 14, marginBottom: 12 }}
         />
+        {/* 已引用知识库文档 */}
+        {quotedDocs.length > 0 && (
+          <div className="rpt-ai-quoted" style={{ padding: 0, marginBottom: 12 }}>
+            {quotedDocs.map((d) => (
+              <span key={d.id} className="rpt-ai-quoted-tag">
+                {d.name}
+                <span
+                  className="rpt-ai-quoted-close"
+                  onClick={() => setQuotedDocs((prev) => prev.filter((x) => x.id !== d.id))}
+                >
+                  ×
+                </span>
+              </span>
+            ))}
+          </div>
+        )}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Upload
-            beforeUpload={() => false}
-            showUploadList={{ showRemoveIcon: true }}
-          >
-            <Button type="text" icon={<InboxOutlined />} style={{ color: COLORS.textSecondary }}>
-              添加附件
+          <div className="rpt-ai-input-left">
+            <Upload
+              beforeUpload={() => false}
+              showUploadList={{ showRemoveIcon: true }}
+            >
+              <Button type="text" icon={<InboxOutlined />} style={{ color: COLORS.textSecondary }}>
+                添加附件
+              </Button>
+            </Upload>
+            <Button
+              type="text"
+              icon={<BookOutlined />}
+              className="rpt-ai-attach-btn"
+              onClick={() => setKbModalOpen(true)}
+            >
+              引用知识库
             </Button>
-          </Upload>
+          </div>
           <Button
             type="primary"
             size="large"
@@ -129,6 +182,23 @@ export default function IndustryReports() {
             进入写作
           </Button>
         </div>
+
+        {/* 引用知识库弹窗 */}
+        <KnowledgeQuoteModal
+          open={kbModalOpen}
+          onCancel={() => setKbModalOpen(false)}
+          onConfirm={(docs) => {
+            setQuotedDocs((prev) => {
+              const merged = [...prev]
+              docs.forEach((d) => {
+                if (!merged.some((x) => x.id === d.id)) merged.push(d)
+              })
+              return merged
+            })
+            setKbModalOpen(false)
+            message.success(`已引用 ${docs.length} 份知识库文档`)
+          }}
+        />
       </div>
 
       {/* 下方历史研报列表 */}

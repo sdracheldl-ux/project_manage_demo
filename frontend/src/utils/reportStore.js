@@ -12,6 +12,11 @@ function loadJSON(key, fallback) {
   }
 }
 
+/** 生成唯一 id */
+export function genReportId() {
+  return `rpt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
 /** 去除 HTML 标签提取纯文本 */
 export function stripHtml(html) {
   const tmp = document.createElement('div')

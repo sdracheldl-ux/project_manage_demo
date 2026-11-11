@@ -557,8 +557,15 @@ body {
   padding: 4px 0 8px 84px;
 }
 
+/* ========== 通用可收起面板 ========== */
+/* 面板容器：相对定位，为底部梯形折叠按钮预留空间 */
+.collapse-panel {
+  position: relative;
+  margin-bottom: 30px;
+}
+
 /* 折叠/展开按钮（面板底部居中，白色梯形下凸） */
-.ent-filter-toggle {
+.collapse-toggle {
   position: absolute;
   left: 50%;
   bottom: -22px;
@@ -574,7 +581,7 @@ body {
   z-index: 3;
 }
 
-.ent-filter-toggle::before {
+.collapse-toggle::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -584,14 +591,14 @@ body {
 }
 
 /* 展开/收起图标：置于梯形背景之上，居中显示 */
-.ent-filter-toggle .anticon {
+.collapse-toggle .anticon {
   position: relative;
   z-index: 1;
   font-size: 12px;
   margin-top: -4px;
 }
 
-.ent-filter-toggle:hover {
+.collapse-toggle:hover {
   color: #1677ff;
 }
 
@@ -993,6 +1000,426 @@ body {
   padding: 14px 4px 0;
   font-size: 12px;
   color: #bfbfbf;
+}
+
+/* ========== 驻外周报 ========== */
+/* 汇报统计卡片网格（Tab1）：6 张单位卡片自适应铺满 */
+.zw-unit-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-auto-rows: 1fr; /* 所有行等高，卡片高度统一 */
+  gap: 16px;
+  padding: 8px 0 8px;
+}
+
+.zw-unit-card {
+  position: relative;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 16px 18px 12px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .06);
+  transition: box-shadow .25s, transform .25s;
+  overflow: hidden;
+}
+
+.zw-unit-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .12);
+  transform: translateY(-2px);
+}
+
+.zw-unit-card.submitted {
+  border-color: #b7eb8f;
+  box-shadow: 0 1px 4px rgba(82, 196, 26, .12);
+}
+
+.zw-unit-card.submitted:hover {
+  box-shadow: 0 4px 16px rgba(82, 196, 26, .22);
+}
+
+/* 已提交卡片左侧绿色描边 */
+.zw-unit-card.submitted::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: #52c41a;
+}
+
+/* 头部：单位名 + 状态标签 */
+.zw-unit-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.zw-unit-card-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #262626;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.zw-unit-card-tag {
+  margin: 0;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.zw-unit-card-tag.unsubmitted {
+  color: #8c8c8c;
+  background: #f5f5f5;
+  border: 1px dashed #d9d9d9;
+}
+
+/* 摘要：两行截断 */
+.zw-unit-card-summary {
+  font-size: 13px;
+  line-height: 20px;
+  color: #595959;
+  min-height: 40px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.zw-unit-card-summary.empty {
+  color: #bfbfbf;
+}
+
+/* 底部：期号/保存时间 + 查看按钮 */
+.zw-unit-card-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid #f5f5f5;
+}
+
+.zw-unit-card-meta {
+  font-size: 12px;
+  color: #8c8c8c;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.zw-unit-card-view {
+  padding: 0;
+  flex-shrink: 0;
+}
+
+/* Tab 标签上的未报数角标 */
+.zw-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: #fa8c16;
+  border-radius: 9px;
+}
+
+/* 填报卡片内的富文本编辑器：定高可滚动（覆盖研报编辑器的 flex:1 全高布局） */
+.zw-weekly-editor .rpt-editor {
+  border: 1px solid #f0f0f0;
+  border-radius: 4px;
+}
+.zw-weekly-editor .rpt-editor .rpt-editor-body {
+  flex: none;
+  min-height: 200px;
+  max-height: 400px;
+}
+
+/* 历史周报抽屉内的只读富文本展示 */
+.zw-weekly-view {
+  font-size: 14px;
+  line-height: 1.8;
+  color: #333;
+}
+.zw-weekly-view:empty::after {
+  content: '暂无内容';
+  color: #bfbfbf;
+}
+.zw-weekly-view h2 {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 14px 0 8px;
+  color: #262626;
+}
+.zw-weekly-view h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 12px 0 6px;
+  color: #262626;
+}
+.zw-weekly-view p {
+  margin: 6px 0;
+}
+.zw-weekly-view ul,
+.zw-weekly-view ol {
+  padding-left: 28px;
+  margin: 6px 0;
+}
+
+/* ========== 驻外线索统计卡片 zw-stat-* ========== */
+.zw-stat-cards {
+  display: grid;
+  /* 6 张卡片始终单行排列 */
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+/* 卡片样式沿用统计看板 StatCard：左色条 + 圆角 + 浅阴影，标题在上、数值与金额同行在下 */
+.zw-stat-card {
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-left: 4px solid #1677ff;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  padding: 10px 16px;
+  min-width: 0;
+  transition: box-shadow .2s;
+}
+.zw-stat-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
+}
+.zw-stat-label {
+  font-size: 13px;
+  color: #8c8c8c;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 数字与金额同行 */
+.zw-stat-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.zw-stat-num {
+  font-size: 22px;
+  font-weight: 700;
+  color: #262626;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.zw-stat-unit {
+  font-size: 12px;
+  font-weight: 400;
+  color: #8c8c8c;
+  margin-left: 3px;
+}
+.zw-stat-sub {
+  font-size: 12px;
+  color: #8c8c8c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ========== 投融资热点区块 inv-* ========== */
+/* 标题 + 筛选工具行 */
+.inv-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.inv-toolbar-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.inv-source-tip {
+  font-size: 12px;
+  font-weight: 400;
+  color: #bfbfbf;
+}
+.inv-toolbar-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+/* 统计条 */
+.inv-stat-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: #fff7e6;
+  border: 1px solid #ffe7ba;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #595959;
+}
+.inv-stat-num {
+  color: #fa541c;
+  font-weight: 600;
+  font-size: 15px;
+  margin: 0 2px;
+}
+.inv-stat-divider {
+  color: #ffe7ba;
+}
+/* 榜单卡片 */
+.inv-rank-card {
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  padding: 10px 12px 6px;
+  height: 100%;
+}
+.inv-rank-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  color: #262626;
+  margin-bottom: 6px;
+}
+.inv-rank-hint {
+  font-size: 12px;
+  font-weight: 400;
+  color: #8c8c8c;
+}
+/* 热门融资事件行（字体对齐产业热度榜：名称 #333 常规、金额 #262626 加粗、日期 12px #bfbfbf） */
+.inv-event-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px dashed #f0f0f0;
+  font-size: 13px;
+}
+.inv-event-row:last-child {
+  border-bottom: none;
+}
+.inv-event-row:hover {
+  background: #fafcff;
+}
+.inv-event-row .ant-tag {
+  font-size: 11px;
+  line-height: 18px;
+  padding: 0 5px;
+  margin: 0;
+}
+.inv-event-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.inv-event-company {
+  color: #333;
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+.inv-event-amount {
+  flex-shrink: 0;
+  font-weight: 600;
+  font-size: 13px;
+}
+.inv-event-date {
+  flex-shrink: 0;
+  width: 44px;
+  text-align: right;
+  color: #bfbfbf;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+/* 活跃投资机构行（同上对齐） */
+.inv-org-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px dashed #f0f0f0;
+  font-size: 13px;
+}
+.inv-org-row:last-child {
+  border-bottom: none;
+}
+.inv-org-name {
+  flex: 1;
+  min-width: 0;
+  color: #333;
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.inv-org-count {
+  flex-shrink: 0;
+  color: #595959;
+}
+.inv-org-amount {
+  flex-shrink: 0;
+  width: 110px;
+  text-align: right;
+  color: #bfbfbf;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+/* 表格展开详情 */
+.inv-expand {
+  padding: 4px 8px;
+}
+/* 融资事件列表：正文 13px/#333 对齐产业热度部分（局部覆盖全局 14px 表格） */
+.inv-table .ant-table-tbody > tr > td {
+  font-size: 13px;
+  color: #333;
+}
+.inv-table .ant-table-tbody > tr > td .ant-tag {
+  font-size: 11px;
+  line-height: 18px;
+  padding: 0 5px;
+  margin: 0;
+}
+.inv-expand-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #262626;
+  margin-bottom: 4px;
+}
+.inv-expand-text {
+  font-size: 13px;
+  color: #595959;
+  line-height: 1.7;
+}
+.inv-expand-label {
+  color: #8c8c8c;
 }
 
 /* ========== 榜单规则配置 ========== */

@@ -13,6 +13,7 @@ import {
   HOT_INDUSTRY_META,
 } from '../../mock/hotIndustryData'
 import RankingConfigDrawer, { loadRankConfig, RANK_CONFIG_KEY } from './components/RankingConfigDrawer'
+import InvestHotSection from './components/InvestHotSection'
 
 /**
  * 热门产业榜单
@@ -363,6 +364,9 @@ export default function IndustryRankings() {
           </div>
         </Col>
       </Row>
+
+      {/* ⑤ 投融资热点（外采-创投市场投融资事件，位于热门资讯下方） */}
+      <InvestHotSection />
 
       {/* 数据来源说明 */}
       <div className="hot-meta-footer">

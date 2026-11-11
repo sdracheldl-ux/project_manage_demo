@@ -20,6 +20,10 @@ export default function RichTextEditor({ value, onChange, placeholder }) {
   useEffect(() => {
     if (ref.current && ref.current.innerHTML !== (value || '')) {
       ref.current.innerHTML = value || ''
+      // 流式写入时（用户未在编辑）自动滚动到底部，跟随生成内容
+      if (document.activeElement !== ref.current) {
+        ref.current.scrollTop = ref.current.scrollHeight
+      }
     }
   }, [value])
 

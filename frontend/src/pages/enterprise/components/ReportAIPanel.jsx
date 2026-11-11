@@ -1,19 +1,17 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Button, Input, Upload, message } from 'antd'
-import { SendOutlined, FileAddOutlined, PaperClipOutlined, BookOutlined } from '@ant-design/icons'
+import { SendOutlined, PaperClipOutlined, BookOutlined } from '@ant-design/icons'
 import { parseOutlineFromInput, getMockContentBlocks } from '../../../constants/reportEnums'
 import KnowledgeQuoteModal from './KnowledgeQuoteModal'
 import OutlineConfirmCard from './OutlineConfirmCard'
 
 /**
- * AI 对话区（mock 流式输出 + 附件上传 + 知识库引用）
- * 流程：用户输入 → 智能体生成大纲（卡片，需确认）→ 流式生成正文 → 应用到编辑区
+ * AI 对话区（大纲确认 + 流式写作 + 附件上传 + 知识库引用）
+ * 流程：用户输入 → 智能体生成大纲（卡片，需确认）→ 流式撰写正文（直接写入中间编辑区，会话区不呈现正文）
  */
 export default function ReportAIPanel({ report, chatHistory, onChatChange, onApplyHtml }) {
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
-  const [streamHtml, setStreamHtml] = useState('')
-  const [applied, setApplied] = useState(false)
   const [messages, setMessages] = useState(chatHistory || [])
   const [kbModalOpen, setKbModalOpen] = useState(false)
   const [quotedDocs, setQuotedDocs] = useState([])
@@ -21,12 +19,6 @@ export default function ReportAIPanel({ report, chatHistory, onChatChange, onApp
   const msgEndRef = useRef(null)
   const messagesRef = useRef(messages)
   const regenerateVariantRef = useRef(0)
-
-  // 最近一次生成的正文（从对话历史派生，刷新后仍可应用）
-  const lastBody = useMemo(
-    () => [...messages].reverse().find((m) => m.type === 'body'),
-    [messages]
-  )
 
   useEffect(() => {
     messagesRef.current = messages
@@ -38,7 +30,7 @@ export default function ReportAIPanel({ report, chatHistory, onChatChange, onApp
 
   useEffect(() => {
     msgEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, streamHtml])
+  }, [messages])
 
   useEffect(() => {
     return () => {
@@ -76,11 +68,10 @@ export default function ReportAIPanel({ report, chatHistory, onChatChange, onApp
     }
   }
 
-  /** 逐部分流式输出正文 */
+  /** 逐部分流式撰写正文：内容直接写入中间编辑区，会话区仅保留状态提示 */
   const streamBlocks = (sections) => {
     const blocks = getMockContentBlocks(sections)
     setStreaming(true)
-    setStreamHtml('')
     let i = 0
     let acc = ''
     streamTimer.current = setInterval(() => {
@@ -88,24 +79,22 @@ export default function ReportAIPanel({ report, chatHistory, onChatChange, onApp
         clearInterval(streamTimer.current)
         streamTimer.current = null
         setStreaming(false)
-        setStreamHtml('')
-        setApplied(false)
         commit([
           ...messagesRef.current,
           {
             id: `msg-${Date.now()}-${Math.random()}`,
             role: 'assistant',
-            type: 'body',
-            content: acc,
+            type: 'text',
+            content: '正文已按大纲生成完毕，并已写入编辑区。如需调整内容或补充章节，可继续向我发起要求。',
             time: Date.now(),
           },
         ])
-        message.success('正文已生成，可点击"应用到编辑区"')
+        message.success('正文已生成并写入编辑区')
         return
       }
       acc += blocks[i]
       i += 1
-      setStreamHtml(acc)
+      onApplyHtml?.(acc)
     }, 600)
   }
 
@@ -125,7 +114,7 @@ export default function ReportAIPanel({ report, chatHistory, onChatChange, onApp
     setTimeout(() => generateOutline(text, pending?.id), 400)
   }
 
-  /** 用户确认大纲 → 流式生成正文 */
+  /** 用户确认大纲 → 流式生成正文（写入编辑区） */
   const handleConfirmOutline = (msgId, sections) => {
     commit(
       messagesRef.current.map((m) =>
@@ -141,14 +130,6 @@ export default function ReportAIPanel({ report, chatHistory, onChatChange, onApp
   const handleRegenerateOutline = (msgId, source) => {
     regenerateVariantRef.current += 1
     generateOutline(source, msgId, regenerateVariantRef.current)
-  }
-
-  const handleApply = () => {
-    if (lastBody?.content) {
-      onApplyHtml?.(lastBody.content)
-      setApplied(true)
-      message.success('已应用到编辑区')
-    }
   }
 
   const handleKeyDown = (e) => {
@@ -190,7 +171,9 @@ export default function ReportAIPanel({ report, chatHistory, onChatChange, onApp
             </div>
           </div>
         )}
-        {messages.map((msg) => (
+        {messages
+          .filter((m) => m.type !== 'body') // 旧版本会在会话区存正文消息，此处忽略
+          .map((msg) => (
           <div
             key={msg.id}
             className={`rpt-msg ${msg.role === 'user' ? 'rpt-msg-user' : 'rpt-msg-ai'}${
@@ -207,11 +190,6 @@ export default function ReportAIPanel({ report, chatHistory, onChatChange, onApp
                   onRegenerate={() => handleRegenerateOutline(msg.id, msg.source)}
                 />
               </>
-            ) : msg.type === 'body' ? (
-              <div
-                className="rpt-msg-bubble rpt-msg-bubble-stream"
-                dangerouslySetInnerHTML={{ __html: msg.content }}
-              />
             ) : (
               <div
                 className="rpt-msg-bubble"
@@ -220,19 +198,12 @@ export default function ReportAIPanel({ report, chatHistory, onChatChange, onApp
             )}
           </div>
         ))}
-        {(streaming || streamHtml) && (
+        {streaming && (
           <div className="rpt-msg rpt-msg-ai">
-            <div className="rpt-msg-bubble rpt-msg-bubble-stream">
-              <span dangerouslySetInnerHTML={{ __html: streamHtml }} />
-              {streaming && <span className="rpt-ai-cursor" />}
+            <div className="rpt-msg-bubble">
+              正在按大纲撰写正文，内容将实时写入编辑区
+              <span className="rpt-ai-cursor" />
             </div>
-          </div>
-        )}
-        {lastBody && !applied && (
-          <div className="rpt-ai-apply">
-            <Button type="primary" icon={<FileAddOutlined />} onClick={handleApply}>
-              应用到编辑区
-            </Button>
           </div>
         )}
         <div ref={msgEndRef} />

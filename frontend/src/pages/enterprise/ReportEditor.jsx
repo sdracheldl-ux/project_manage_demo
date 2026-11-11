@@ -1,14 +1,14 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Input, message } from 'antd'
-import { ArrowLeftOutlined, DownloadOutlined, AuditOutlined, PlusOutlined, SaveOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, DownloadOutlined, AuditOutlined, PlusOutlined } from '@ant-design/icons'
 import { COLORS } from '../../constants/uiStyles'
 import { getReport, upsertReport, getAllReports, genReportId } from '../../utils/reportStore'
 import RichTextEditor from './components/RichTextEditor'
 import ReportAIPanel from './components/ReportAIPanel'
 
 /** 研报写作详情页（独立全屏，不走 MainLayout）
- * 布局：左栏研报列表 + 中栏编辑区 + 右栏 AI 对话（顶部含下载/审核/保存按钮）
+ * 布局：左栏研报列表 + 中栏编辑区 + 右栏 AI 对话（顶部含AI审核/下载按钮）
  */
 export default function ReportEditor() {
   const navigate = useNavigate()
@@ -16,7 +16,6 @@ export default function ReportEditor() {
 
   const [report, setReport] = useState(null)
   const [allReports, setAllReports] = useState([])
-  const [tick, setTick] = useState(0)
   const saveTimer = useRef(null)
   const reportRef = useRef(null)
 
@@ -93,18 +92,6 @@ export default function ReportEditor() {
     message.info('AI 审核功能开发中...')
   }
 
-  const handleSave = () => {
-    if (saveTimer.current) {
-      clearTimeout(saveTimer.current)
-      saveTimer.current = null
-    }
-    if (reportRef.current) {
-      upsertReport(reportRef.current)
-      setAllReports(getAllReports())
-    }
-    message.success('研报已保存')
-  }
-
   const handleBack = () => {
     flushSave()
     navigate('/intelligence/reports')
@@ -130,18 +117,16 @@ export default function ReportEditor() {
     upsertReport(newReport)
     setReport(newReport)
     setAllReports(getAllReports())
-    setTick((n) => n + 1)
     navigate(`/intelligence/reports/edit/${newId}`, { replace: true })
   }
 
-  // 智能体输出为完整正文，重复应用时覆盖而非追加
+  // 智能体流式写入正文（覆盖式；RichTextEditor 为受控同步，无需重挂载）
   const handleApplyHtml = (html) => {
     setReport((prev) => {
       const next = { ...prev, content: html }
       debouncedSave(next)
       return next
     })
-    setTick((n) => n + 1)
   }
 
   const handleChatChange = (chatHistory) => {
@@ -153,7 +138,7 @@ export default function ReportEditor() {
 
   return (
     <div className="rpt-page">
-      {/* 通栏头部：左侧返回 + 右侧下载/AI审核/保存 */}
+      {/* 通栏头部：左侧返回 + 右侧AI审核/下载 */}
       <div className="rpt-header">
         <div className="rpt-header-left">
           <Button type="text" icon={<ArrowLeftOutlined />} onClick={handleBack}>返回</Button>
@@ -167,7 +152,6 @@ export default function ReportEditor() {
         </div>
         <div className="rpt-header-right">
           <span className="rpt-auto-save-tip">报告会自动保存，无需担心丢失</span>
-          <Button icon={<SaveOutlined />} onClick={handleSave}>保存</Button>
           <Button icon={<AuditOutlined />} onClick={handleAIAudit}>AI审核</Button>
           <Button type="primary" icon={<DownloadOutlined />} onClick={handleDownload}>下载</Button>
         </div>
@@ -200,7 +184,6 @@ export default function ReportEditor() {
         <div className="rpt-editor-col">
           {/* 富文本编辑器 */}
           <RichTextEditor
-            key={tick}
             value={report.content}
             onChange={(html) => updateField('content', html)}
             placeholder="请输入研报内容，或使用右侧 AI 助手生成..."

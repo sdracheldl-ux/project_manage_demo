@@ -30,6 +30,9 @@ import {
   ScanOutlined,
   StarOutlined,
   TrophyOutlined,
+  GlobalOutlined,
+  GiftOutlined,
+  SolutionOutlined,
 } from '@ant-design/icons'
 import { useViewRole, useMessages } from '../store/viewStore'
 import { VIEW_ROLES } from '../constants/assignConfig'
@@ -61,12 +64,22 @@ const menuItems = [
     icon: <ProjectOutlined />,
     label: '项目全生命周期管理',
     children: [
+      { key: '/project/zhuwai', icon: <GlobalOutlined />, label: '驻外线索' },
+      { key: '/project/zhaoshang', icon: <GiftOutlined />, label: '招商活动线索' },
       { key: '/project/mouhua', icon: <AppstoreOutlined />, label: '项目谋划' },
       { key: '/project/zaitan', icon: <TeamOutlined />, label: '跟踪洽谈' },
       { key: '/project/qianyue', icon: <FileTextOutlined />, label: '签约注册' },
       { key: '/project/luodi', icon: <AuditOutlined />, label: '项目落地' },
       { key: '/project/yanpan', icon: <WarningOutlined />, label: '项目重复研判' },
       { key: '/project/tuiku', icon: <StopOutlined />, label: '项目退库' },
+    ],
+  },
+  {
+    key: 'overseas',
+    icon: <SolutionOutlined />,
+    label: '驻外事务',
+    children: [
+      { key: '/overseas/weekly', icon: <FileTextOutlined />, label: '驻外周报' },
     ],
   },
   {
@@ -96,6 +109,10 @@ const menuItems = [
 ]
 
 const breadcrumbMap = {
+  '/project/zhuwai': ['项目全生命周期管理', '驻外线索'],
+  '/project/zhuwai/detail': ['项目全生命周期管理', '驻外线索', '项目详情'],
+  '/project/zhaoshang': ['项目全生命周期管理', '招商活动线索'],
+  '/project/zhaoshang/detail': ['项目全生命周期管理', '招商活动线索', '活动详情'],
   '/project/mouhua': ['项目全生命周期管理', '项目谋划'],
   '/project/mouhua/detail': ['项目全生命周期管理', '项目谋划', '项目详情'],
   '/project/zaitan': ['项目全生命周期管理', '跟踪洽谈'],
@@ -104,6 +121,8 @@ const breadcrumbMap = {
   '/project/luodi': ['项目全生命周期管理', '项目落地'],
   '/project/yanpan': ['项目全生命周期管理', '项目重复研判'],
   '/project/tuiku': ['项目全生命周期管理', '项目退库'],
+  '/overseas/weekly': ['驻外事务', '驻外周报'],
+  '/overseas/weekly/edit': ['驻外事务', '驻外周报', '周报编写'],
   '/performance/park': ['绩效考核', '园区考核'],
   '/performance/soe': ['绩效考核', '国企考核'],
   '/performance/dept': ['绩效考核', '部门考核'],
@@ -163,8 +182,11 @@ export default function MainLayout() {
   }, [realPath, openKeys])
 
   const getBreadcrumbKey = (path) => {
+    if (path.startsWith('/project/zhuwai/detail')) return '/project/zhuwai/detail'
+    if (path.startsWith('/project/zhaoshang/detail')) return '/project/zhaoshang/detail'
     if (path.startsWith('/project/mouhua/detail')) return '/project/mouhua/detail'
     if (path.startsWith('/project/zaitan/detail')) return '/project/zaitan/detail'
+    if (path.startsWith('/overseas/weekly/edit')) return '/overseas/weekly/edit'
     if (path.startsWith('/intelligence/enterprise/detail')) return '/intelligence/enterprise/detail'
     if (path.startsWith('/intelligence/reports/edit')) return '/intelligence/reports/edit'
     return path
@@ -183,12 +205,18 @@ export default function MainLayout() {
   }
 
   const getMenuKey = (path) => {
+    if (path.startsWith('/project/zhuwai')) return '/project/zhuwai'
+    if (path.startsWith('/project/zhaoshang')) return '/project/zhaoshang'
     if (path.startsWith('/project/mouhua')) return '/project/mouhua'
     if (path.startsWith('/project/zaitan')) return '/project/zaitan'
     if (path.startsWith('/project/qianyue')) return '/project/qianyue'
     if (path.startsWith('/project/luodi')) return '/project/luodi'
     if (path.startsWith('/project/yanpan')) return '/project/yanpan'
     if (path.startsWith('/project/tuiku')) return '/project/tuiku'
+    if (path.startsWith('/overseas/')) {
+      const matched = menuItems.find(m => m.key === 'overseas').children.find(c => path.startsWith(c.key))
+      return matched ? matched.key : path
+    }
     if (path.startsWith('/dashboard/project')) return '/dashboard/project'
     if (path.startsWith('/dashboard/perf')) return '/dashboard/perf'
     if (path.startsWith('/intelligence/enterprise/favorites')) return '/intelligence/enterprise/favorites'
@@ -250,7 +278,7 @@ export default function MainLayout() {
             overflow: 'hidden',
           }}
         >
-          {collapsed ? '光谷' : '光谷项目全周期管理平台'}
+          {collapsed ? '光谷' : '光谷产业洞察智能体'}
         </div>
         <Menu
           theme="dark"

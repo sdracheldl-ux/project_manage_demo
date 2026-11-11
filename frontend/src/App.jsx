@@ -2,6 +2,12 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import MainLayout from './layouts/MainLayout'
 import Mouhua from './pages/Mouhua'
 import MouhuaDetail from './pages/MouhuaDetail'
+import Zhuwai from './pages/Zhuwai'
+import ZhuwaiDetail from './pages/ZhuwaiDetail'
+import ZhaoshangList from './pages/ZhaoshangList'
+import ZhaoshangDetail from './pages/ZhaoshangDetail'
+import WeeklyReport from './pages/WeeklyReport'
+import WeeklyReportEdit from './pages/WeeklyReportEdit'
 import Zaitan from './pages/Zaitan'
 import ZaitanDetail from './pages/ZaitanDetail'
 import Qianyue from './pages/Qianyue'
@@ -46,6 +52,10 @@ function App() {
         <Route index element={<Navigate to="/project/zaitan" replace />} />
         <Route path="project/mouhua" element={<Mouhua />} />
         <Route path="project/mouhua/detail/:id" element={<MouhuaDetail />} />
+        <Route path="project/zhuwai" element={<Zhuwai />} />
+        <Route path="project/zhuwai/detail/:id" element={<ZhuwaiDetail />} />
+        <Route path="project/zhaoshang" element={<ZhaoshangList />} />
+        <Route path="project/zhaoshang/detail/:activityId" element={<ZhaoshangDetail />} />
         <Route path="project/zaitan" element={<Zaitan />} />
         <Route path="project/zaitan/detail/:id" element={<ZaitanDetail />} />
         <Route path="project/qianyue" element={<Qianyue />} />
@@ -56,6 +66,8 @@ function App() {
         <Route path="project/yanpan/detail/:id" element={<YanpanDetail />} />
         <Route path="project/tuiku" element={<Tuiku />} />
         <Route path="project/tuiku/detail/:id" element={<TuikuDetail />} />
+        <Route path="overseas/weekly" element={<WeeklyReport />} />
+        <Route path="overseas/weekly/edit/:id?" element={<WeeklyReportEdit />} />
         <Route path="performance/park" element={<CategoryPerformancePage category="park" />} />
         <Route path="performance/soe" element={<CategoryPerformancePage category="soe" />} />
         <Route path="performance/dept" element={<CategoryPerformancePage category="dept" />} />

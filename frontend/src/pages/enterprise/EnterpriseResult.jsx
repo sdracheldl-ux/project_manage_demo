@@ -8,6 +8,7 @@ import {
   DownOutlined,
 } from '@ant-design/icons'
 import { searchEnterprises } from '../../mock/enterpriseData'
+import CollapseToggle from '../../components/CollapseToggle'
 import {
   ENTERPRISE_SEARCH_SCOPES,
   ENTERPRISE_NATURE_OPTIONS,
@@ -210,7 +211,7 @@ export default function EnterpriseResult() {
       </div>
 
       {/* 筛选条件 */}
-      <div className="table-card ent-filter-card">
+      <div className="table-card ent-filter-card collapse-panel">
         <div style={sectionTitleStyle}>筛选条件</div>
 
         <div className="ent-filter-body">
@@ -345,9 +346,7 @@ export default function EnterpriseResult() {
           )}
         </div>
 
-        <div className="ent-filter-toggle" onClick={() => setExpanded(!expanded)}>
-          {expanded ? <UpOutlined /> : <DownOutlined />}
-        </div>
+        <CollapseToggle expanded={expanded} onClick={() => setExpanded(!expanded)} />
       </div>
 
       {/* 结果列表 */}

@@ -179,7 +179,7 @@ export default function IndustryReports() {
             onClick={handleEnterEditor}
             disabled={!title.trim() && !content.trim()}
           >
-            进入写作
+            进入研报撰写
           </Button>
         </div>
 

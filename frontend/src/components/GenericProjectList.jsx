@@ -26,6 +26,9 @@ export default function GenericProjectList({
   onImport,        // 自定义导入按钮点击回调（不传则显示demo提示）
   onAdd,
   addExtraButtons, // 工具栏左侧额外按钮
+  topFilters,      // 主筛选行附加筛选项（渲染在日期选择之后，格式同 filters）
+  statsSlot,       // 统计区插槽（渲染在筛选栏与列表之间）
+  headerSlot,      // 页面顶部插槽（渲染在筛选栏之前，用于详情页头部卡片）
   scrollX = 2200,
   showProjectStatus = true,
   hiddenFilters = [], // 要隐藏的默认筛选项key数组：acceptStatus/auditStatus/warnStatus/enterpriseNature
@@ -40,7 +43,7 @@ export default function GenericProjectList({
     warnStatus: undefined,
     enterpriseNature: undefined,
     dateRange: null,
-    ...Object.fromEntries((extraFilters || []).map(f => [f.key, undefined])),
+    ...Object.fromEntries([...(extraFilters || []), ...(topFilters || [])].map(f => [f.key, undefined])),
   })
   const [selectedRowKeys, setSelectedRowKeys] = useState([])
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10 })
@@ -62,8 +65,8 @@ export default function GenericProjectList({
   const filteredData = useMemo(() => {
     return data.filter(r => {
       if (filters.projectName && !(r.projectName || r['项目名称'] || '').includes(filters.projectName)) return false
-      // 附加筛选项：对 extraFilters 定义 key/dataIndex 的真实过滤
-      for (const f of extraFilters || []) {
+      // 附加筛选项：对 extraFilters / topFilters 定义 key/dataIndex 的真实过滤
+      for (const f of [...(extraFilters || []), ...(topFilters || [])]) {
         const sel = filters[f.key]
         const emptySel = sel === undefined || sel === null || sel === '' || (Array.isArray(sel) && sel.length === 0)
         if (emptySel) continue
@@ -106,7 +109,7 @@ export default function GenericProjectList({
   const handleSearch = () => { message.success('查询完成'); setPagination(p => ({ ...p, current: 1 })) }
   const handleReset = () => {
     const resetState = { projectName: '', industryType: undefined, category: undefined, acceptStatus: undefined, auditStatus: undefined, dateRange: null }
-    ;(extraFilters || []).forEach(f => { resetState[f.key] = f.type === 'input' ? '' : f.type === 'dateRange' ? null : undefined })
+    ;[...(extraFilters || []), ...(topFilters || [])].forEach(f => { resetState[f.key] = f.type === 'input' ? '' : f.type === 'dateRange' ? null : undefined })
     setFilters(resetState)
   }
 
@@ -195,6 +198,7 @@ export default function GenericProjectList({
 
   return (
     <div className="page-container">
+      {headerSlot}
       <div className="filter-bar">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <Input style={{ width: fw }} placeholder="项目名称"
@@ -223,6 +227,16 @@ export default function GenericProjectList({
           )}
           <RangePicker style={{ width: 260 }} value={filters.dateRange}
             onChange={(v) => setFilters({ ...filters, dateRange: v })} />
+          {(topFilters || []).map(f => (
+            <Select key={f.key} placeholder={f.label} {...selectCommon}
+              mode={f.multiple ? 'multiple' : undefined}
+              options={f.options}
+              showSearch
+              allowClear
+              maxTagCount="responsive"
+              style={{ width: f.width || (f.multiple ? 220 : fw) }}
+              value={filters[f.key]} onChange={(v) => setFilters({ ...filters, [f.key]: v })} />
+          ))}
           {(() => {
             const hasExpandContent =
               (extraFilters && extraFilters.length > 0) ||
@@ -286,6 +300,9 @@ export default function GenericProjectList({
           <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
         </div>
       </div>
+
+      {/* 统计区插槽（筛选栏与列表之间） */}
+      {statsSlot && <div style={{ marginBottom: 12 }}>{statsSlot}</div>}
 
       <div className="table-card">
         <div className="table-toolbar">

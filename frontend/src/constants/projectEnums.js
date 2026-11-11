@@ -287,7 +287,7 @@ export const CORE_DECISION_OPTIONS = {
 export const LAND_SITUATION_OPTIONS = ['新供地', '现有用地', '租赁厂房', '购买房产', '其他']
 
 // ===== 区级项目编码 =====
-// 格式：YYYYMMDD + 3位序号（如 20260910001），在谋划阶段新增项目后由系统自动创建
+// 格式：YYYYMMDD + 3位序号（如 20260910001），线索/项目转入正式管理后由系统自动创建
 export const generateDistrictCode = () => {
   const now = new Date()
   const pad = (n, len = 2) => String(n).padStart(len, '0')
@@ -298,6 +298,30 @@ export const generateDistrictCode = () => {
 
 // 存量演示数据的区级项目编码种子（mock 原始数据无此字段）
 export const DISTRICT_CODE_SEEDS = ['20260508001', '20260512002', '20260420003', '20260506004']
+
+// ===== 线索编码（驻外线索阶段专用） =====
+// 格式：XW + YYYYMMDD + 3位序号（如 XW20261105001）；线索转为项目后才生成区级项目编码
+export const generateClueCode = () => {
+  const now = new Date()
+  const pad = (n, len = 2) => String(n).padStart(len, '0')
+  const dateStr = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`
+  const seq = String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')
+  return `XW${dateStr}${seq}`
+}
+
+// 存量演示数据的线索编码种子
+export const CLUE_CODE_SEEDS = ['XW20261012001', 'XW20260908002', 'XW20261103003', 'XW20261028004']
+
+// ===== 招商活动线索编码（招商活动下线索专用） =====
+// 格式：ZS + YYYYMMDD + 3位序号（如 ZS20261105001）；区别于驻外线索 XW 前缀
+export const generateZsClueCode = () => {
+  const now = new Date()
+  const pad = (n, len = 2) => String(n).padStart(len, '0')
+  const dateStr = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`
+  const seq = String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')
+  return `ZS${dateStr}${seq}`
+}
+export const ZS_CLUE_CODE_SEEDS = ['ZS20261012001', 'ZS20260908002', 'ZS20261103003', 'ZS20261028004']
 
 // 存量演示数据的市级项目编码种子（mock 原始数据无此字段）
 export const CITY_CODE_SEEDS = ['SJ20260301001', 'SJ20260302015', 'SJ20260305023', 'SJ20260311008']

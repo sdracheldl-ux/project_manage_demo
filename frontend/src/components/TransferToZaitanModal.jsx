@@ -23,7 +23,7 @@ const SectionHeader = ({ title }) => (
   </div>
 )
 
-export default function TransferToZaitanModal({ open, onCancel, onOk, projectData }) {
+export default function TransferToZaitanModal({ open, onCancel, onOk, projectData, codeLabel = '区级项目编码', codeValue }) {
   const [form] = Form.useForm()
   // ===== 实时判重（PRD 2.1.8 场景一：转在谈补判重，比对在谈库）=====
   const [warnVisible, setWarnVisible] = useState(false)
@@ -44,8 +44,8 @@ export default function TransferToZaitanModal({ open, onCancel, onOk, projectDat
       l4AckRef.current = false
       const fv = projectData._formValues || {}
       const initialValues = {
-        // 谋划阶段带出
-        districtProjectCode: projectData.districtProjectCode,
+        // 编码显示：默认区级项目编码；线索来源（驻外线索）传 codeLabel/codeValue 显示线索编码
+        districtProjectCode: codeValue !== undefined ? codeValue : projectData.districtProjectCode,
         projectName: projectData.projectName,
         capitalNature: fv.capitalNature,
         sourceRegion: fv.sourceRegion,
@@ -187,8 +187,8 @@ export default function TransferToZaitanModal({ open, onCancel, onOk, projectDat
           <SectionHeader title="项目基本信息" />
         <Row gutter={24}>
           <Col {...colProps}>
-            <Form.Item label="区级项目编码" name="districtProjectCode">
-              <Input disabled placeholder="系统自动生成" />
+            <Form.Item label={codeLabel} name="districtProjectCode">
+              <Input disabled placeholder={codeValue !== undefined ? '' : '系统自动生成'} />
             </Form.Item>
           </Col>
           <Col {...colProps}>

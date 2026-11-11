@@ -44,12 +44,7 @@ export default function WeeklyReport() {
     { title: '序号', width: 55, align: 'center', fixed: 'left', render: (_, __, idx) => idx + 1 },
     {
       title: '期号', key: 'issue', width: 140, align: 'center',
-      render: (_, r) => (
-        <span>
-          {r.year}年第{r.issueNo}期
-          {isCurrentWeek && <Tag color="blue" style={{ margin: '0 0 0 6px', lineHeight: '18px' }}>本周</Tag>}
-        </span>
-      ),
+      render: (_, r) => <span>{r.year}年第{r.issueNo}期</span>,
     },
     { title: '汇报单位', dataIndex: 'unitName', width: 170, align: 'center' },
     {

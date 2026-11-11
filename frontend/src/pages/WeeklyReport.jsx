@@ -52,7 +52,6 @@ export default function WeeklyReport() {
       ),
     },
     { title: '汇报单位', dataIndex: 'unitName', width: 170, align: 'center' },
-    { title: '周报期间', dataIndex: 'rangeLabel', width: 160, align: 'center' },
     {
       title: '本周重点工作摘要', key: 'thisSummary', ellipsis: true,
       render: (_, r) => summarize(r.thisWeekWork) || <span style={{ color: muted }}>-</span>,
@@ -137,7 +136,7 @@ export default function WeeklyReport() {
         columns={columns}
         dataSource={weekRecords}
         pagination={false}
-        scroll={{ x: 1180 }}
+        scroll={{ x: 1020 }}
         tableLayout="fixed"
         size="middle"
         locale={{ emptyText: <Empty description={isCurrentWeek ? '本周暂无周报，点击上方「新增周报」开始填报' : '该周暂无周报'} /> }}

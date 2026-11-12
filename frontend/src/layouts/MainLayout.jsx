@@ -32,7 +32,7 @@ import {
   TrophyOutlined,
   GlobalOutlined,
   GiftOutlined,
-  SolutionOutlined,
+  AimOutlined,
 } from '@ant-design/icons'
 import { useViewRole, useMessages } from '../store/viewStore'
 import { VIEW_ROLES } from '../constants/assignConfig'
@@ -49,14 +49,13 @@ const menuItems = [
     ],
   },
   {
-    key: 'intelligence',
-    icon: <CompassOutlined />,
-    label: '产业情报',
+    key: 'clue',
+    icon: <AimOutlined />,
+    label: '线索管理',
     children: [
-      { key: '/intelligence/enterprise', icon: <ScanOutlined />, label: '企业线索洞察' },
-      { key: '/intelligence/enterprise/favorites', icon: <StarOutlined />, label: '关注企业' },
-      { key: '/intelligence/reports', icon: <FileTextOutlined />, label: '产业研报' },
-      { key: '/intelligence/enterprise/rankings', icon: <TrophyOutlined />, label: '热点榜单' },
+      { key: '/project/zhuwai', icon: <GlobalOutlined />, label: '驻外线索' },
+      { key: '/project/zhaoshang', icon: <GiftOutlined />, label: '招商活动线索' },
+      { key: '/overseas/weekly', icon: <FileTextOutlined />, label: '驻外周报' },
     ],
   },
   {
@@ -64,8 +63,6 @@ const menuItems = [
     icon: <ProjectOutlined />,
     label: '项目全生命周期管理',
     children: [
-      { key: '/project/zhuwai', icon: <GlobalOutlined />, label: '驻外线索' },
-      { key: '/project/zhaoshang', icon: <GiftOutlined />, label: '招商活动线索' },
       { key: '/project/mouhua', icon: <AppstoreOutlined />, label: '项目谋划' },
       { key: '/project/zaitan', icon: <TeamOutlined />, label: '跟踪洽谈' },
       { key: '/project/qianyue', icon: <FileTextOutlined />, label: '签约注册' },
@@ -75,11 +72,14 @@ const menuItems = [
     ],
   },
   {
-    key: 'overseas',
-    icon: <SolutionOutlined />,
-    label: '驻外事务',
+    key: 'intelligence',
+    icon: <CompassOutlined />,
+    label: '产业情报',
     children: [
-      { key: '/overseas/weekly', icon: <FileTextOutlined />, label: '驻外周报' },
+      { key: '/intelligence/enterprise', icon: <ScanOutlined />, label: '企业线索洞察' },
+      { key: '/intelligence/enterprise/favorites', icon: <StarOutlined />, label: '关注企业' },
+      { key: '/intelligence/reports', icon: <FileTextOutlined />, label: '产业研报' },
+      { key: '/intelligence/enterprise/rankings', icon: <TrophyOutlined />, label: '热点榜单' },
     ],
   },
   {
@@ -109,10 +109,10 @@ const menuItems = [
 ]
 
 const breadcrumbMap = {
-  '/project/zhuwai': ['项目全生命周期管理', '驻外线索'],
-  '/project/zhuwai/detail': ['项目全生命周期管理', '驻外线索', '项目详情'],
-  '/project/zhaoshang': ['项目全生命周期管理', '招商活动线索'],
-  '/project/zhaoshang/detail': ['项目全生命周期管理', '招商活动线索', '活动详情'],
+  '/project/zhuwai': ['线索管理', '驻外线索'],
+  '/project/zhuwai/detail': ['线索管理', '驻外线索', '项目详情'],
+  '/project/zhaoshang': ['线索管理', '招商活动线索'],
+  '/project/zhaoshang/detail': ['线索管理', '招商活动线索', '活动详情'],
   '/project/mouhua': ['项目全生命周期管理', '项目谋划'],
   '/project/mouhua/detail': ['项目全生命周期管理', '项目谋划', '项目详情'],
   '/project/zaitan': ['项目全生命周期管理', '跟踪洽谈'],
@@ -121,8 +121,8 @@ const breadcrumbMap = {
   '/project/luodi': ['项目全生命周期管理', '项目落地'],
   '/project/yanpan': ['项目全生命周期管理', '项目重复研判'],
   '/project/tuiku': ['项目全生命周期管理', '项目退库'],
-  '/overseas/weekly': ['驻外事务', '驻外周报'],
-  '/overseas/weekly/edit': ['驻外事务', '驻外周报', '周报编写'],
+  '/overseas/weekly': ['线索管理', '驻外周报'],
+  '/overseas/weekly/edit': ['线索管理', '驻外周报', '周报编写'],
   '/performance/park': ['绩效考核', '园区考核'],
   '/performance/soe': ['绩效考核', '国企考核'],
   '/performance/dept': ['绩效考核', '部门考核'],
@@ -214,7 +214,7 @@ export default function MainLayout() {
     if (path.startsWith('/project/yanpan')) return '/project/yanpan'
     if (path.startsWith('/project/tuiku')) return '/project/tuiku'
     if (path.startsWith('/overseas/')) {
-      const matched = menuItems.find(m => m.key === 'overseas').children.find(c => path.startsWith(c.key))
+      const matched = menuItems.find(m => m.key === 'clue').children.find(c => path.startsWith(c.key))
       return matched ? matched.key : path
     }
     if (path.startsWith('/dashboard/project')) return '/dashboard/project'

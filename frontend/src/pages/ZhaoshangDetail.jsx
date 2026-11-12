@@ -58,6 +58,9 @@ const ACTIVITY_SEEDS = [
 // 线索统计基数（mock 历史转化，演示用）
 const STAT_BASE = { distributed: 3, zaitan: 2, qianyue: 1, qianyueAmount: 5.5, luodi: 0, luodiAmount: 0 }
 
+// 申报人：招商活动由投促局或具体园区主办，申报人为主办方人员
+const ZS_REPORTERS = ['投促局 王琳', '光电园 易成龙', '投促局 陈卓', '生物城 韩雪']
+
 export default function ZhaoshangDetail() {
   const { activityId } = useParams()
   const navigate = useNavigate()
@@ -191,7 +194,7 @@ export default function ZhaoshangDetail() {
       key: `zs-clue-${idx + 1}`,
       index: idx + 1,
       clueCode: ZS_CLUE_CODE_SEEDS[idx % ZS_CLUE_CODE_SEEDS.length],
-      reporter: item['申报人'] || `活动线索填报人${idx + 1}`,
+      reporter: ZS_REPORTERS[idx % ZS_REPORTERS.length],
       projectName: item['项目名称'] || `活动线索项目${idx + 1}`,
       sourceArea: item['来源地'] || '-',
       industryCategory: item['产业类别'] || mockFormValues[idx].industryCategory.join(' / '),
@@ -251,7 +254,7 @@ export default function ZhaoshangDetail() {
       const newItem = {
         key: `zs-clue-${Date.now()}`,
         clueCode,
-        reporter: '活动线索填报人',
+        reporter: '投促局',
         projectName: values.projectName,
         sourceArea: values.sourceRegion ? values.sourceRegion.join(' / ') : '-',
         industryCategory: values.industryCategory ? values.industryCategory.join(' / ') : '-',

@@ -53,8 +53,8 @@ const menuItems = [
     icon: <AimOutlined />,
     label: '线索管理',
     children: [
-      { key: '/project/zhuwai', icon: <GlobalOutlined />, label: '驻外线索' },
       { key: '/project/zhaoshang', icon: <GiftOutlined />, label: '招商活动线索' },
+      { key: '/project/zhuwai', icon: <GlobalOutlined />, label: '驻外线索' },
       { key: '/overseas/weekly', icon: <FileTextOutlined />, label: '驻外周报' },
     ],
   },

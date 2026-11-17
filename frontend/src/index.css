@@ -1677,11 +1677,12 @@ body {
 
 /* ===== 产业研报 rpt-* 系列 ===== */
 
-/* 三栏布局（全屏，不走 MainLayout） */
+/* 研报编写页（主布局 Content 内，占满可用高度） */
 .rpt-page {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100%;
+  min-height: calc(100vh - 56px);
   background: #f5f7fb;
   overflow: hidden;
 }
@@ -1716,7 +1717,7 @@ body {
   margin-right: 4px;
 }
 
-/* 主体区：左栏 + 中栏 + 右栏 */
+/* 主体区：左栏 + 右侧对话窗口 */
 .rpt-body {
   display: flex;
   flex: 1;
@@ -1769,33 +1770,7 @@ body {
   text-overflow: ellipsis;
 }
 
-/* 中栏 */
-.rpt-editor-col {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  background: #fff;
-}
-.rpt-editor-topbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border-bottom: 1px solid #f0f0f0;
-  height: 56px;
-  flex-shrink: 0;
-}
-.rpt-meta-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 24px;
-  border-bottom: 1px solid #f0f0f0;
-  flex-shrink: 0;
-}
-
-/* 富文本编辑器 */
+/* 富文本编辑器（驻外周报编写页等仍在使用） */
 .rpt-editor {
   display: flex;
   flex-direction: column;
@@ -1852,12 +1827,11 @@ body {
   margin: 8px 0;
 }
 
-/* 右栏 AI 对话区 */
+/* 右侧 AI 对话窗口（占满剩余空间） */
 .rpt-ai-panel {
-  width: 520px;
-  flex-shrink: 0;
+  flex: 1;
+  min-width: 0;
   background: #fff;
-  border-left: 1px solid #f0f0f0;
   display: flex;
   flex-direction: column;
 }
@@ -1875,6 +1849,13 @@ body {
   min-height: 0;
   overflow-y: auto;
   padding: 12px;
+}
+/* 阅读列：消息内容限宽居中，避免大屏下行宽过长不利阅读 */
+.rpt-ai-messages .rpt-msg,
+.rpt-ai-messages .rpt-ai-empty {
+  max-width: 860px;
+  margin-left: auto;
+  margin-right: auto;
 }
 .rpt-ai-empty {
   text-align: center;
@@ -2086,8 +2067,10 @@ body {
   padding: 8px 12px 12px;
   flex-shrink: 0;
 }
-/* 会话框：输入区 + 底部工具栏一体化，外层圆角边框，内部无分割 */
+/* 会话框：输入区 + 底部工具栏一体化，外层圆角边框，内部无分割；与消息阅读列同宽居中 */
 .rpt-ai-input-box {
+  max-width: 860px;
+  margin: 0 auto;
   border: 1px solid #d9d9d9;
   border-radius: 12px;
   background: #fff;
@@ -2160,6 +2143,274 @@ body {
 }
 .rpt-ai-quoted-close:hover {
   color: #1677ff;
+}
+
+/* ========== 研报对话窗口新交互样式 ========== */
+/* 引导语示例块：展示「第一部分；要点」撰写格式 */
+.rpt-ai-guide-example {
+  margin: 16px auto 12px;
+  max-width: 460px;
+  text-align: left;
+  background: #f7f9fc;
+  border: 1px solid #e6eef8;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 12px;
+  line-height: 1.9;
+  color: #595959;
+  white-space: pre-wrap;
+}
+.rpt-ai-guide-btn {
+  color: #1677ff;
+  border-color: #91caff;
+}
+/* 正文消息：白底卡片。公文专用字体（仿宋/黑体/楷体）Web 端无法保证呈现，
+   会话区恢复默认字体，公文版式仅在下载导出的文档中体现 */
+.rpt-msg-ai .rpt-msg-report-bubble {
+  background: #fff;
+  border: 1px solid #ebeef5;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  max-width: 100%;
+  width: 100%;
+  padding: 16px 20px;
+  font-size: 15px;
+  line-height: 1.8;
+}
+/* 一级标题（第X部分） */
+.rpt-msg-report-bubble h2 {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 14px 0 6px;
+}
+/* 正文段落：首行缩进2字符 */
+.rpt-msg-report-bubble p {
+  text-indent: 2em;
+  margin: 0 0 4px;
+}
+/* 报送行：顶格不缩进，上下通栏分割线 */
+.rpt-msg-report-bubble hr.rpt-report-divider {
+  border: none;
+  border-top: 1px solid #e6ebf2;
+  margin: 12px 0;
+}
+.rpt-msg-report-bubble p.rpt-report-baosong {
+  text-indent: 0;
+  color: #595959;
+  font-size: 13px;
+}
+/* 附表：表题居中表上方、表头加粗、单倍行距、全框线（字体用默认 UI 字体） */
+.rpt-msg-report-bubble .rpt-report-table-title {
+  font-size: 15px;
+  font-weight: 600;
+  text-indent: 0;
+  text-align: center;
+  margin: 16px 0 8px;
+}
+.rpt-msg-report-bubble .rpt-report-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 auto;
+}
+.rpt-msg-report-bubble .rpt-report-table th,
+.rpt-msg-report-bubble .rpt-report-table td {
+  border: 1px solid #d9d9d9;
+  padding: 5px 10px;
+  line-height: 1.4; /* 表内单倍行距，不用正文1.5倍 */
+  text-indent: 0;
+}
+.rpt-msg-report-bubble .rpt-report-table th {
+  font-weight: 600;
+  font-size: 14px;
+  text-align: center;
+}
+.rpt-msg-report-bubble .rpt-report-table td {
+  font-size: 13px;
+  text-align: center;
+}
+.rpt-msg-report-bubble .rpt-report-table-note {
+  font-size: 12px;
+  color: #8c8c8c;
+  text-indent: 0;
+  margin: 6px 0 0;
+}
+/* 信源标注：正文句尾上标 [n] */
+.rpt-msg-report-bubble sup.rpt-cite {
+  color: #1677ff;
+  font-size: 11px;
+  font-weight: 600;
+  margin: 0 1px;
+  line-height: 0;
+}
+/* 信源清单：正文下方的浅底卡片区块，编号与正文上标对应，名称为可点击链接 */
+.rpt-source-list {
+  margin: 16px 0 8px;
+  padding: 12px 16px;
+  background: #f7f9fc;
+  border: 1px solid #e6ebf2;
+  border-radius: 8px;
+}
+.rpt-source-list-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #262626;
+  margin-bottom: 6px;
+}
+.rpt-source-list-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rpt-source-list-items li {
+  font-size: 13px;
+  color: #595959;
+  line-height: 2;
+}
+.rpt-source-idx {
+  color: #1677ff;
+  font-weight: 600;
+  margin-right: 6px;
+}
+.rpt-source-link {
+  color: #1677ff;
+  text-decoration: none;
+}
+.rpt-source-link:hover {
+  text-decoration: underline;
+}
+.rpt-source-meta {
+  color: #8c8c8c;
+  font-size: 12px;
+  margin-left: 10px;
+}
+/* 正文消息底部操作行：版本标签 + 复制/下载/重新生成 */
+.rpt-msg-report-ops {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 0 2px;
+}
+.rpt-msg-report-ver {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+.rpt-msg-report-ops-btns {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.rpt-msg-report-ops-btns .ant-btn {
+  padding: 0 6px;
+  font-size: 12px;
+  color: #8c8c8c;
+}
+.rpt-msg-report-ops-btns .ant-btn:hover {
+  color: #1677ff;
+  background: rgba(22, 119, 255, 0.06);
+}
+/* 选中效果自绘高亮层：覆盖在选中文字上方，不依赖原生选区，松手后稳定可见 */
+.rpt-highlight-rect {
+  position: fixed;
+  z-index: 99;
+  background: rgba(22, 119, 255, 0.18);
+  border-radius: 2px;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+/* 停止生成按钮：流式输出期间发送按钮切换为白色方块停止图标 */
+.rpt-ai-stop-icon {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border-radius: 2px;
+}
+/* 选区引用气泡：选中消息文字后在选区上方浮现 */
+.rpt-selection-bubble {
+  position: fixed;
+  transform: translate(-50%, -100%);
+  z-index: 100;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  background: #1677ff;
+  color: #fff;
+  font-size: 12px;
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(22, 119, 255, 0.35);
+  cursor: pointer;
+  user-select: none;
+  margin-top: -6px;
+}
+.rpt-selection-bubble:hover {
+  background: #4096ff;
+}
+/* 用户消息内引用块展示（选中文字引用） */
+.rpt-msg-quote-ref {
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid #b5dcff;
+  border-radius: 6px;
+  padding: 5px 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: #1677ff;
+  text-align: left;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.rpt-msg-quote-ref .anticon {
+  margin-right: 2px;
+}
+/* 输入框上方引用块 */
+.rpt-quote-block {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 10px 0;
+  padding: 6px 10px;
+  background: #f0f7ff;
+  border: 1px solid #cfe6ff;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #1677ff;
+}
+.rpt-quote-block-icon {
+  flex-shrink: 0;
+}
+.rpt-quote-block-label {
+  flex-shrink: 0;
+  font-weight: 500;
+}
+.rpt-quote-block-excerpt {
+  flex: 1;
+  min-width: 0;
+  color: #595959;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.5;
+}
+.rpt-quote-block-close {
+  flex-shrink: 0;
+  cursor: pointer;
+  font-size: 12px;
+  color: #91caff;
+}
+.rpt-quote-block-close:hover {
+  color: #1677ff;
+}
+/* 左栏空态 */
+.rpt-sidebar-empty {
+  padding: 24px 0;
+}
+.rpt-sidebar-empty .ant-empty-description {
+  font-size: 12px;
+  color: #bfbfbf;
 }
 
 /* 知识引用弹窗 */

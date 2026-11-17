@@ -36,7 +36,6 @@ import EnterpriseDetail from './pages/enterprise/EnterpriseDetail'
 import EnterpriseResult from './pages/enterprise/EnterpriseResult'
 import EnterpriseFavorites from './pages/enterprise/EnterpriseFavorites'
 import IndustryRankings from './pages/enterprise/IndustryRankings'
-import IndustryReports from './pages/enterprise/IndustryReports'
 import ReportEditor from './pages/enterprise/ReportEditor'
 
 function App() {
@@ -44,9 +43,6 @@ function App() {
     <Routes>
       {/* H5 移动端页面（无侧边栏布局） */}
       <Route path="/h5/dashboard" element={<DashboardH5 />} />
-
-      {/* 研报编辑页（独立全屏，不走 MainLayout） */}
-      <Route path="/intelligence/reports/edit/:id?" element={<ReportEditor />} />
 
       <Route path="/" element={<MainLayout />}>
         <Route index element={<Navigate to="/project/zaitan" replace />} />
@@ -78,7 +74,9 @@ function App() {
         <Route path="intelligence/enterprise/result" element={<EnterpriseResult />} />
         <Route path="intelligence/enterprise/favorites" element={<EnterpriseFavorites />} />
         <Route path="intelligence/enterprise/rankings" element={<IndustryRankings />} />
-        <Route path="intelligence/reports" element={<IndustryReports />} />
+        {/* 产业研报：直接进入编写页（主布局内，保留左侧导航），列表页已移除 */}
+        <Route path="intelligence/reports" element={<Navigate to="/intelligence/reports/edit" replace />} />
+        <Route path="intelligence/reports/edit/:id?" element={<ReportEditor />} />
         <Route path="intelligence/enterprise/detail/:name" element={<EnterpriseDetail />} />
         <Route path="system/account" element={<Account />} />
         <Route path="system/role" element={<Role />} />

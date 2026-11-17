@@ -542,7 +542,7 @@ function ProjectStatsSection() {
           {[
             { key: 'sponsor', label: '投促局' },
             { key: 'park', label: '园区' },
-            { key: 'overseas', label: '驻外办', expandable: true },
+            // { key: 'overseas', label: '驻外办', expandable: true }, // 驻外办入口暂时隐藏
             { key: 'all', label: '全区' },
           ].map((tab) => {
             const isActive = subjectType === tab.key

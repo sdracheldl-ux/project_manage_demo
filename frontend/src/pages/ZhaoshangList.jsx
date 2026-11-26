@@ -5,15 +5,20 @@ import {
   Modal, Tag, message, Tooltip, Popover, Checkbox, Divider, Dropdown
 } from 'antd'
 import {
-  PlusOutlined, EyeOutlined, DeleteOutlined, EditOutlined, ReloadOutlined, SearchOutlined, SettingOutlined, MoreOutlined
+  PlusOutlined, EyeOutlined, DeleteOutlined, EditOutlined, ReloadOutlined, SearchOutlined, SettingOutlined, MoreOutlined, InboxOutlined
 } from '@ant-design/icons'
 import {
   pageCardStyle,
 } from '../constants/uiStyles'
+import { ZS_REPORT_UNIT_SELECT_GROUPS } from '../constants/projectEnums'
+import AiSummaryBar, { hl } from '../components/AiSummaryBar'
 
 const actionLinkStyle = { color: '#1677ff', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 14, cursor: 'pointer' }
 
 const { TextArea } = Input
+
+// 当前登录人所属单位（demo 设定）：申报单位由创建活动人所属单位自动带出，不可手改
+const CURRENT_USER_UNIT = '半导体组'
 
 // 活动 mock 种子数据
 const ACTIVITY_SEEDS = [
@@ -21,6 +26,7 @@ const ACTIVITY_SEEDS = [
     id: 'zs-act-1',
     activityDate: '2026-10-15',
     isHost: true,
+    reportUnit: '半导体组',
     activityName: '2026光谷集成电路产业招商对接会',
     activityDesc: '面向集成电路头部企业专题招商，邀请30余家相关企业参会，现场对接并收集意向线索。',
     enterpriseCount: 32,
@@ -33,6 +39,7 @@ const ACTIVITY_SEEDS = [
     id: 'zs-act-2',
     activityDate: '2026-10-22',
     isHost: false,
+    reportUnit: '智能终端组',
     activityName: '第四届武汉粤港澳大湾区投资推介会',
     activityDesc: '市级主办，区级参与，对接大湾区智能制造与创新药企业。',
     enterpriseCount: 45,
@@ -45,6 +52,7 @@ const ACTIVITY_SEEDS = [
     id: 'zs-act-3',
     activityDate: '2026-11-03',
     isHost: true,
+    reportUnit: '光谷生物城',
     activityName: '光谷生物城创新药专场招商沙龙',
     activityDesc: '联合光谷生物城举办，围绕创新药CDMO、高端医疗器械方向开展定向招商。',
     enterpriseCount: 18,
@@ -57,6 +65,7 @@ const ACTIVITY_SEEDS = [
     id: 'zs-act-4',
     activityDate: '2026-11-08',
     isHost: false,
+    reportUnit: '人工智能组',
     activityName: '2026中国光谷国际人工智能产业峰会',
     activityDesc: '参与市级主办峰会，对接人工智能、智能机器人企业20余家。',
     enterpriseCount: 24,
@@ -76,18 +85,22 @@ export default function ZhaoshangList() {
   const [form] = Form.useForm()
   const [editForm] = Form.useForm()
   const [list, setList] = useState(ACTIVITY_SEEDS)
-  const [filters, setFilters] = useState({ dateRange: null, name: '', isHost: undefined })
+  const [filters, setFilters] = useState({ dateRange: null, name: '', isHost: undefined, reportUnit: undefined })
   const [editVisible, setEditVisible] = useState(false)
   const [editing, setEditing] = useState(null)
   const [saving, setSaving] = useState(false)
+  // 新增活动成功后的线索引导弹窗
+  const [guideVisible, setGuideVisible] = useState(false)
+  const [guideActivity, setGuideActivity] = useState(null)
   // 表头管理
   const [columnPopoverOpen, setColumnPopoverOpen] = useState(false)
 
-  // 简单筛选：名称模糊 + 是否主办 + 时间区间（demo 仅做名称与主办过滤）
+  // 简单筛选：名称模糊 + 是否主办 + 申报单位 + 时间区间（demo 仅做名称、主办与申报单位过滤）
   const filteredList = useMemo(() => {
     return list.filter(a => {
       if (filters.name && !a.activityName.includes(filters.name)) return false
       if (filters.isHost !== undefined && filters.isHost !== '' && String(a.isHost) !== String(filters.isHost)) return false
+      if (filters.reportUnit && a.reportUnit !== filters.reportUnit) return false
       return true
     })
   }, [list, filters])
@@ -95,7 +108,7 @@ export default function ZhaoshangList() {
   const totalClues = filteredList.reduce((s, a) => s + (a.clueCount || 0), 0)
 
   const handleSearch = () => setFilters({ ...filters })
-  const handleReset = () => { setFilters({ dateRange: null, name: '', isHost: undefined }); form.resetFields() }
+  const handleReset = () => { setFilters({ dateRange: null, name: '', isHost: undefined, reportUnit: undefined }); form.resetFields() }
 
   const handleAdd = () => {
     setEditing(null)
@@ -129,23 +142,29 @@ export default function ZhaoshangList() {
           activityDesc: values.activityDesc,
         } : a))
         message.success('活动已更新')
+        setEditVisible(false)
       } else {
         const id = `zs-act-${Date.now()}`
-        setList(prev => [{
+        const newActivity = {
           id,
           activityDate: dateStr,
           activityName: values.activityName,
           isHost: values.isHost,
+          reportUnit: CURRENT_USER_UNIT, // 申报单位由创建活动人所属单位自动带出
           enterpriseCount: values.enterpriseCount,
           activityDesc: values.activityDesc,
           clueCount: 0,
           transferredCount: 0,
           qianyueCount: 0,
           luodiCount: 0,
-        }, ...prev])
+        }
+        setList(prev => [newActivity, ...prev])
         message.success('活动已新增')
+        setEditVisible(false)
+        // 引导用户继续为活动新增或导入线索
+        setGuideActivity(newActivity)
+        setGuideVisible(true)
       }
-      setEditVisible(false)
     } catch (e) {
       // validation
     } finally {
@@ -186,6 +205,7 @@ export default function ZhaoshangList() {
       key: 'activityName', title: '活动名称', dataIndex: 'activityName', ellipsis: true,
       render: (v, r) => <a onClick={() => handleView(r)}>{v}</a>
     },
+    { key: 'reportUnit', title: '申报单位', dataIndex: 'reportUnit', width: 140, align: 'center', ellipsis: true, render: v => v || '-' },
     {
       key: 'isHost', title: '是否主办单位', dataIndex: 'isHost', width: 120, align: 'center',
       render: v => v ? <Tag color="blue">是</Tag> : <Tag>否</Tag>
@@ -249,8 +269,31 @@ export default function ZhaoshangList() {
     </div>
   )
 
+  // ===== AI总结概述条（实时统计）：活动、线索与转化情况一览，口径与顶部统计条一致 =====
+  const summary = useMemo(() => {
+    const actTotal = filteredList.length
+    const clueTotal = filteredList.reduce((s, a) => s + (a.clueCount || 0), 0)
+    const enterpriseTotal = filteredList.reduce((s, a) => s + (a.enterpriseCount || 0), 0)
+    const transferredTotal = filteredList.reduce((s, a) => s + (a.transferredCount || 0), 0)
+    const qianyueTotal = filteredList.reduce((s, a) => s + (a.qianyueCount || 0), 0)
+    const luodiTotal = filteredList.reduce((s, a) => s + (a.luodiCount || 0), 0)
+    // 签约转化率 = 转签约总数 ÷ 线索总数（线索总数为 0 时省略该分句）
+    const qianyueRate = clueTotal ? Math.round((qianyueTotal / clueTotal) * 100) : null
+    return { actTotal, clueTotal, enterpriseTotal, transferredTotal, qianyueTotal, luodiTotal, qianyueRate }
+  }, [filteredList])
+
+  const summaryNode = (
+    <AiSummaryBar>
+      当前共收录招商活动{hl(summary.actTotal)}场，累计获取线索{hl(summary.clueTotal)}条，覆盖对接企业{hl(summary.enterpriseTotal)}家；
+      累计转化在谈{hl(summary.transferredTotal)}个，签约{hl(summary.qianyueTotal)}个、落地{hl(summary.luodiTotal)}个
+      {summary.qianyueRate !== null && <span>，签约转化率{hl(`${summary.qianyueRate}%`)}</span>}。
+    </AiSummaryBar>
+  )
+
   return (
     <div className="page-container" style={pageCardStyle}>
+      {/* AI总结概述条 */}
+      {summaryNode}
       {/* 筛选栏 */}
       <div className="filter-bar">
         <Form form={form} layout="inline" style={{ flexWrap: 'wrap', gap: 8 }}>
@@ -268,6 +311,18 @@ export default function ZhaoshangList() {
                 { value: true, label: '是' },
                 { value: false, label: '否' },
               ]}
+            />
+          </Form.Item>
+          <Form.Item name="reportUnit" label="申报单位">
+            <Select
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              placeholder="请选择申报单位"
+              style={{ width: 180 }}
+              value={filters.reportUnit}
+              onChange={v => setFilters(f => ({ ...f, reportUnit: v }))}
+              options={ZS_REPORT_UNIT_SELECT_GROUPS}
             />
           </Form.Item>
           <Form.Item>
@@ -302,7 +357,7 @@ export default function ZhaoshangList() {
           rowKey="id"
           columns={visibleColumns}
           dataSource={filteredList}
-          scroll={{ x: 1140 }}
+          scroll={{ x: 1280 }}
           tableLayout="fixed"
           pagination={{ pageSize: 10, showTotal: t => `共 ${t} 条` }}
         />
@@ -322,6 +377,9 @@ export default function ZhaoshangList() {
       >
         <Form form={editForm} layout="vertical" requiredMark>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 24, rowGap: 0 }}>
+            <Form.Item label="活动名称" name="activityName" rules={[{ required: true, message: '请输入活动名称' }, { max: 100, message: '不超过100个字符' }]} style={{ gridColumn: '1 / span 2' }}>
+              <Input placeholder="请输入活动名称" maxLength={100} showCount />
+            </Form.Item>
             <Form.Item label="活动时间" name="activityDate" rules={[{ required: true, message: '请选择活动时间' }]}>
               <DatePicker style={{ width: '100%' }} />
             </Form.Item>
@@ -331,9 +389,6 @@ export default function ZhaoshangList() {
                 <Radio value={false}>否</Radio>
               </Radio.Group>
             </Form.Item>
-            <Form.Item label="活动名称" name="activityName" rules={[{ required: true, message: '请输入活动名称' }, { max: 100, message: '不超过100个字符' }]} style={{ gridColumn: '1 / span 2' }}>
-              <Input placeholder="请输入活动名称" maxLength={100} showCount />
-            </Form.Item>
             <Form.Item label="对接企业数(家)" name="enterpriseCount" rules={[{ required: true, message: '请输入对接企业数' }]}>
               <InputNumber min={0} precision={0} style={{ width: '100%' }} placeholder="请输入对接企业数" />
             </Form.Item>
@@ -342,6 +397,36 @@ export default function ZhaoshangList() {
             </Form.Item>
           </div>
         </Form>
+      </Modal>
+
+      {/* 新增活动成功：引导继续新增 / 导入线索 */}
+      <Modal
+        title="活动已创建"
+        open={guideVisible}
+        onCancel={() => setGuideVisible(false)}
+        footer={null}
+        width={520}
+        destroyOnClose
+      >
+        <p style={{ margin: '8px 0 16px' }}>
+          活动「{guideActivity?.activityName}」已创建（申报单位：{guideActivity?.reportUnit}），活动下还没有线索，您可以继续：
+        </p>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <Button onClick={() => setGuideVisible(false)}>稍后再说</Button>
+          <Button
+            icon={<InboxOutlined />}
+            onClick={() => { setGuideVisible(false); navigate(`/project/zhaoshang/detail/${guideActivity.id}?action=import`) }}
+          >
+            去导入线索
+          </Button>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => { setGuideVisible(false); navigate(`/project/zhaoshang/detail/${guideActivity.id}?action=add`) }}
+          >
+            去新增线索
+          </Button>
+        </div>
       </Modal>
     </div>
   )

@@ -9,6 +9,7 @@ import {
   ExportOutlined, PauseCircleOutlined, ExclamationCircleOutlined, RobotOutlined
 } from '@ant-design/icons'
 import mockData from '../mock/data.json'
+import { activityStore } from '../utils/activityStore'
 import TransferToZaitanModal from '../components/TransferToZaitanModal'
 import ProgressTimeline from '../components/ProgressTimeline'
 import ProgressSummaryModal from '../components/ProgressSummaryModal'
@@ -222,6 +223,7 @@ export default function MouhuaDetail() {
         ])
         message.success('进展已添加')
       }
+      activityStore.addActivity({ stage: 'mouhua', projectId: project.key, projectName: project.projectName, type: 'progress', summary: values.content })
       setProgressModalVisible(false)
       progressForm.resetFields()
     } catch (e) {
@@ -258,6 +260,7 @@ export default function MouhuaDetail() {
     ])
     setTransferModalVisible(false)
     message.success('该项目已从谋划列表移至在谈列表，正在跳转...')
+    activityStore.addActivity({ stage: 'mouhua', projectId: project.key, projectName: project.projectName, type: 'stageChange', summary: '由「谋划」阶段转入「在谈」' })
     setTimeout(() => navigate('/project/zaitan'), 1000)
   }
 
@@ -300,7 +303,7 @@ export default function MouhuaDetail() {
               进展汇报
             </Button>
             <Button className="ai-grad-btn" icon={<RobotOutlined />} onClick={() => setAiVisible(true)}>
-              AI 摘要
+              AI 月度摘要
             </Button>
             <Button icon={<EditOutlined />} onClick={handleEditBasic}>
               编辑
@@ -489,25 +492,18 @@ export default function MouhuaDetail() {
         </div>
       </Modal>
 
-      {/* AI 月度进展摘要弹窗（严格按当前自然月） */}
+      {/* AI 月度摘要弹窗（月报段落模式，按项目+年月存档） */}
       <ProgressSummaryModal
         open={aiVisible}
         onCancel={() => setAiVisible(false)}
+        projectId={project.key}
         projectName={project.projectName}
         stageLabel="谋划阶段"
         items={progressList}
-        onSave={(content) => {
-          const now = new Date()
-          const pad2 = (n) => String(n).padStart(2, '0')
-          const ts = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())} ${pad2(now.getHours())}:${pad2(now.getMinutes())}`
-          setProgressList((prev) => [{
-            id: `ai-${Date.now()}`,
-            content,
-            reporter: CURRENT_USER,
-            updateTime: ts,
-            stage: '谋划阶段',
-          }, ...prev])
-        }}
+        intro={project.projectDesc}
+        investAmount={project.investAmount}
+        industryCategory={project.industryCategory}
+        capitalNature={project.capitalNature}
       />
     </div>
   )

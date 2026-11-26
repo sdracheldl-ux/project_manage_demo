@@ -33,6 +33,8 @@ import {
   SendOutlined,
   SwapOutlined,
   ExclamationCircleOutlined,
+  PlusOutlined,
+  ImportOutlined,
 } from '@ant-design/icons'
 import mockData from '../mock/data.json'
 import { getDecisionNodes } from '../components/DecisionFlow'
@@ -41,8 +43,13 @@ import ZaitanEditModal from '../components/ZaitanEditModal'
 import AssignModal from '../components/AssignModal'
 import ZhuanQianyueModal from '../components/ZhuanQianyueModal'
 import TransferZaitanModal from '../components/TransferZaitanModal'
-import { RESPONSIBLE_UNIT_SELECT_GROUPS, RESPONSIBLE_UNIT_OPTIONS, normalizeResponsibleUnits, DISTRICT_CODE_SEEDS } from '../constants/projectEnums'
-import { useViewRole, msgStore, transferStore, useTransferStore } from '../store/viewStore'
+import DuplicateWarningModal from '../components/DuplicateWarningModal'
+import ImportModal from '../components/ImportModal'
+import ZaitanFormFields from '../components/ZaitanFormFields'
+import { RESPONSIBLE_UNIT_SELECT_GROUPS, RESPONSIBLE_UNIT_OPTIONS, normalizeResponsibleUnits, DISTRICT_CODE_SEEDS, generateDistrictCode } from '../constants/projectEnums'
+import { checkDuplicates, buildMouhuaZaitanLib } from '../utils/duplicateCheck'
+import { useViewRole, msgStore, transferStore, useTransferStore, useImported } from '../store/viewStore'
+import AiSummaryBar, { hl } from '../components/AiSummaryBar'
 
 const { RangePicker } = DatePicker
 
@@ -139,8 +146,26 @@ export default function Zaitan() {
   const [tuikuVisible, setTuikuVisible] = useState(false)
   const [tuikuReason, setTuikuReason] = useState('')
 
+  // ===== 新增在谈项目 + 批量导入 =====
+  const [addForm] = Form.useForm()
+  const [addModalVisible, setAddModalVisible] = useState(false)
+  const [addLoading, setAddLoading] = useState(false)
+  const [extraRows, setExtraRows] = useState([]) // 页面态新增行（置顶展示）
+  const [warnVisible, setWarnVisible] = useState(false)
+  const [warnHits, setWarnHits] = useState([])
+  const [warnValues, setWarnValues] = useState(null) // 暂存的表单值（「仍要提交」时使用）
+  const [upgradeHint, setUpgradeHint] = useState('') // 命中谋划库项目时的升阶建议文案
+  const [importVisible, setImportVisible] = useState(false)
+  const imported = useImported()
+
+  // 批量导入成功行（无冲突）：置顶进入在谈列表；冲突行已由 ImportModal 转入研判池（Yanpan 消费）
+  const importedRows = useMemo(
+    () => (imported?.stage === 'zaitan' ? imported.successProjects : []),
+    [imported],
+  )
+
   const data = useMemo(() => {
-    return mockData.zaitan.map((item, idx) => {
+    return [...importedRows, ...extraRows, ...mockData.zaitan].map((item, idx) => {
       const projectCategory = ['政策类', '投资类', '供地类', '其他'][idx % 4]
       return {
         key: item.id,
@@ -183,7 +208,144 @@ export default function Zaitan() {
         })(),
       }
     })
-  }, [])
+  }, [importedRows, extraRows])
+
+  // ===== 新增在谈项目（判重：谋划库 + 在谈库，命中弹 DuplicateWarningModal）=====
+  const handleAddProject = () => {
+    addForm.resetFields()
+    setAddModalVisible(true)
+  }
+
+  // 执行保存（判重通过或确认「仍要提交」后调用）：中文键入库，经 data 统一映射置顶展示
+  const doAddSave = async (values) => {
+    try {
+      setAddLoading(true)
+      const districtProjectCode = generateDistrictCode()
+      const now = new Date()
+      const timeStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+      const fmtDate = (d) => (d && d.format ? d.format('YYYY-MM-DD') : d || '-')
+      const newItem = {
+        id: `zaitan-new-${Date.now()}`,
+        '项目名称': values.projectName,
+        '投资主体': values.investorEntity,
+        '投资金额（亿元）': values.investAmount ?? 0,
+        '责任单位': (values.responsibleUnits || []).join('、'),
+        '内外资': values.capitalNature,
+        '来源地': Array.isArray(values.sourceRegion) ? values.sourceRegion.join(' / ') : (values.sourceRegion || '-'),
+        '产业类别': values.industryType,
+        '行业类别': Array.isArray(values.industryCategory) ? values.industryCategory.join(' / ') : (values.industryCategory || '-'),
+        '项目简介': values.projectDescription || '',
+        '对接时间': fmtDate(values.dockingDate),
+        '企业类别': values.enterpriseCategory || '-',
+        '注册资本': values.registeredCapitalAmount ?? '-',
+        '楚商类型': values.chushangType || '-',
+        '申报人': role ? `${role.deptName}-${role.userName}` : '-',
+        '申报时间': timeStr,
+        '区级项目编码': districtProjectCode,
+        '项目状态': '在谈',
+      }
+      setExtraRows(prev => [newItem, ...prev])
+      message.success(`在谈项目新增成功，区级项目编码：${districtProjectCode}`)
+      setAddModalVisible(false)
+      addForm.resetFields()
+    } finally {
+      setAddLoading(false)
+    }
+  }
+
+  const handleAddOk = async () => {
+    let values
+    try {
+      values = await addForm.validateFields()
+    } catch (e) {
+      return // 校验失败，保持弹窗
+    }
+    const now = new Date()
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    // 判重库：谋划 + 在谈（含页面新增/导入增量行）；字段口径与转在谈弹窗一致（industryType=产业类别）
+    const hits = checkDuplicates({
+      projectName: values.projectName,
+      investorEntity: values.investorEntity,
+      investAmount: values.investAmount,
+      industryCategory: values.industryType || '',
+      industryType: Array.isArray(values.industryCategory) ? values.industryCategory.join(' / ') : '',
+      reporter: role ? role.userName : '',
+      reportTime: today,
+    }, buildMouhuaZaitanLib([...extraRows, ...importedRows]))
+    const strongHits = hits.filter(h => h.level !== 'L4')
+    if (strongHits.length > 0) {
+      // 命中谋划库项目 → 升阶建议：建议从谋划转入而非重复新增
+      setUpgradeHint(
+        strongHits.some(h => h.target.stage === '谋划')
+          ? '该名称与谋划库项目高度相似，建议从谋划转入而非重复新增（可在谋划列表使用「转在谈」流转本项目）。'
+          : '',
+      )
+      setWarnValues(values)
+      setWarnHits(hits)
+      setWarnVisible(true)
+      return
+    }
+    if (hits.length > 0) message.warning('检测到弱相似信号（L4），建议核实是否重复')
+    await doAddSave(values)
+  }
+
+  const handleWarnReturn = () => {
+    setWarnVisible(false)
+    setWarnHits([])
+    setWarnValues(null)
+    setUpgradeHint('')
+  }
+
+  const handleWarnForce = async () => {
+    setWarnVisible(false)
+    setWarnHits([])
+    setUpgradeHint('')
+    const values = warnValues
+    setWarnValues(null)
+    if (values) await doAddSave(values)
+  }
+
+  // ===== 板块概述（实时统计）：让用户一眼掌握在谈库核心信息 =====
+  const summary = useMemo(() => {
+    const total = data.length
+    const investSum = data.reduce((s, r) => s + (Number(r.investAmount) || 0), 0)
+    // 产业类别计数（工业/服务业；农业等其余类别不计入）
+    const byCat = { 工业: 0, 服务业: 0 }
+    // 行业门类计数（行业类别可能为「门类 / 大类」拼接，取门类部分）
+    const byType = {}
+    // 项目分类计数（投资类/政策类/供地类，其余归入其他）
+    const byCls = { 投资类: 0, 政策类: 0, 供地类: 0, 其他: 0 }
+    // 优质企业计数（企业类别为国家级高新技术企业/国家级专精特新）
+    let quality = 0
+    data.forEach((r) => {
+      if (byCat[r.industryCategory] !== undefined) byCat[r.industryCategory] += 1
+      const gate = String(r.industryType || '').split(' / ')[0]
+      if (gate && gate !== '-') byType[gate] = (byType[gate] || 0) + 1
+      byCls[byCls[r.projectCategory] !== undefined ? r.projectCategory : '其他'] += 1
+      const ent = String(r.enterpriseCategory || '')
+      if (ent.includes('国家级高新技术企业') || ent.includes('国家级专精特新')) quality += 1
+    })
+    const topList = Object.entries(byType).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    return { total, investSum, byCat, topList, byCls, quality }
+  }, [data])
+
+  const pctOf = (n) => (summary.total ? Math.round((n / summary.total) * 100) : 0)
+  const catText = ['工业', '服务业'].filter((c) => summary.byCat[c] > 0)
+    .map((c) => <span key={c}>{c}项目{hl(summary.byCat[c])}个</span>)
+    .reduce((acc, item, i) => (i === 0 ? [item] : [...acc, '，', item]), [])
+  const clsText = ['投资类', '政策类', '供地类', '其他']
+    .map((k) => <span key={k}>{k} {hl(summary.byCls[k])}个</span>)
+    .reduce((acc, item, i) => (i === 0 ? [item] : [...acc, '、', item]), [])
+
+  const summaryNode = summary.total === 0 ? null : (
+    <AiSummaryBar>
+      当前在谈项目{hl(summary.total)}个，投资总额{hl(`${summary.investSum.toFixed(1)} 亿元`)}；其中{catText}。
+      {summary.topList.length > 0 && (
+        <span>按产业分布，占比最高为 {summary.topList[0][0]} {hl(`${summary.topList[0][1]}个（${pctOf(summary.topList[0][1])}%）`)}。</span>
+      )}
+      <span>按项目分类，{clsText}；其中国家级高企/专精特新等优质企业 {hl(summary.quality)}家。</span>
+    </AiSummaryBar>
+  )
 
   const filteredData = useMemo(() => {
     return data.filter(r => {
@@ -448,6 +610,7 @@ export default function Zaitan() {
 
   return (
     <div className="page-container">
+      {summaryNode}
       {/* 筛选区域 */}
       <div className="filter-bar">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -549,6 +712,12 @@ export default function Zaitan() {
             )}
           </div>
           <Space size={8}>
+            {isSponsor && (
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleAddProject}>新增在谈项目</Button>
+            )}
+            {isSponsor && (
+              <Button icon={<ImportOutlined />} onClick={() => setImportVisible(true)}>导入</Button>
+            )}
             <Tooltip title="搜索">
               <Button type="text" icon={<SearchOutlined />} />
             </Tooltip>
@@ -704,6 +873,43 @@ export default function Zaitan() {
           />
         </div>
       </Modal>
+
+      {/* 新增在谈项目：判重命中弹 DuplicateWarningModal（命中谋划库附升阶建议） */}
+      <Modal
+        title="新增在谈项目"
+        open={addModalVisible}
+        onCancel={() => { setAddModalVisible(false); addForm.resetFields() }}
+        onOk={handleAddOk}
+        okText="提交"
+        cancelText="取消"
+        confirmLoading={addLoading}
+        width={960}
+        destroyOnClose
+      >
+        <Form form={addForm} labelCol={{ span: 8 }} wrapperCol={{ span: 16 }}>
+          {/* 表单字段共用定义：与「谋划转在谈」弹窗完全一致（ZaitanFormFields），新增时不预填任何承接内容 */}
+          <ZaitanFormFields form={addForm} />
+        </Form>
+      </Modal>
+
+      {/* 新增判重提示：L1 阻断 / L2 L3 可仍要提交；命中谋划库项目时显示升阶建议 */}
+      <DuplicateWarningModal
+        open={warnVisible}
+        hits={warnHits}
+        contextTitle="新增在谈项目"
+        upgradeHint={upgradeHint}
+        onReturn={handleWarnReturn}
+        onForce={handleWarnForce}
+        onCloseAll={() => { setAddModalVisible(false); setWarnVisible(false); setWarnValues(null); setUpgradeHint('') }}
+      />
+
+      {/* 批量导入（在谈）：三步演示导入，冲突行转入研判池（Yanpan 消费），无冲突行置顶入库 */}
+      <ImportModal
+        open={importVisible}
+        stage="zaitan"
+        stageLabel="在谈"
+        onCancel={() => setImportVisible(false)}
+      />
     </div>
   )
 }

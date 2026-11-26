@@ -82,6 +82,15 @@ export function buildZaitanLib() {
   return (mockData.zaitan || []).map(item => adaptRow(item, '在谈'))
 }
 
+// 谋划+在谈统一判重库（谋划/在谈页面的新增与导入共用）：
+// 谋划库基础行与 Mouhua 页 data 前置逻辑一致（mockData.zaitan 前 4 条），mouhuaExtraRows 为谋划页新增/导入的增量行
+export function buildMouhuaZaitanLib(mouhuaExtraRows = []) {
+  return [
+    { stage: '谋划', rows: [...(mockData.zaitan || []).slice(0, 4), ...mouhuaExtraRows] },
+    { stage: '在谈', rows: mockData.zaitan || [] },
+  ]
+}
+
 // ===== 字段级对照 =====
 
 // status: same=一致 / similar=相似 / diff=差异

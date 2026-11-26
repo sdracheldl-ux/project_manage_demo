@@ -1,111 +1,105 @@
-# 项目交接文档（HANDOFF）
+# 项目全周期管理 — 开发交接文档（HANDOFF）
 
-> 更新时间：2026-11-12 | 项目：光谷产业洞察智能体 / 东湖高新区项目全周期管理平台（前端 DEMO）
+> 更新日期：2026-11-24 ｜ 用途：供后续 Agent/开发者接手 ｜ 项目根目录：`/Users/kangsuzhen/Desktop/东湖项目/项目全周期管理`
 
-## 1. 项目概览
+## 1. 项目概况
 
-- **定位**：武汉东湖高新区招商项目全生命周期管理平台前端 DEMO（纯前端 mock，无后端）
-- **技术栈**：React 19 + Ant Design v5/v6 + Vite 8.2.2 + HashRouter + echarts-for-react + dayjs（isoWeek 插件）+ xlsx
-- **目录**：`/Users/kangsuzhen/Desktop/东湖项目/项目全周期管理/frontend`
-- **构建检查**：`cd frontend && npm run build`（开发完成后必须构建检查，无需浏览器验证）
-- **线上部署**：https://sdracheldl-ux.github.io/project_manage_demo
+- **定位**：东湖高新区招商引资「项目全周期管理」DEMO（纯前端，mock 数据内存态；例外：驻外周报为 localStorage 持久化，key `zhuwai_weekly_reports`）
+- **技术栈**：React 18 + Ant Design v5 + Vite + HashRouter
+- **运行**：`cd frontend && npm run dev`（dev server http://localhost:5173/ ，可能有后台会话）
+- **验证**：`cd frontend && npm run build`（每次改动后必须跑，当前通过）
 
-## 2. 一级导航结构（最新）
+## 2. 业务结构
 
-```
-统计看板 / 线索管理 / 项目全生命周期管理 / 产业情报 / 绩效考核 / 系统管理
-```
+| 模块 | 列表/详情文件 | 线索编码前缀 | 说明 |
+|---|---|---|---|
+| 驻外线索 | `Zhuwai.jsx` / `ZhuwaiDetail.jsx` | XW | 三个驻外招商小组（长三角/京津冀/粤港澳大湾区，2026-11-17 确认） |
+| 招商活动线索 | `ZhaoshangDetail.jsx` / `ZhaoshangClueDetail.jsx` | HD | 属于某招商活动，详情含「所属活动」 |
+| 日常线索 | `DailyClueList.jsx` / `DailyClueDetail.jsx` | RC | 无所属活动，投促局及园区日常工作收集 |
 
-- **线索管理**（新）：招商活动线索、驻外线索、驻外周报
-- **统计看板-招商统计**：驻外办页签入口已隐藏（代码注释保留，见 `DashboardProject.jsx` L545）
+- **线索状态机**（三类一致）：无记录=待分派 → 跟进中 → 无效；「转在谈」后线索移出列表进入在谈项目。Tag 色：待分派 default / 跟进中 blue / 无效 red
+- **下游链路**：线索 → 在谈 → 签约 → 落地；转在谈弹窗 `components/TransferToZaitanModal.jsx`
 
-## 3. 已实现模块
+## 3. 关键逻辑与约定（必读）
 
-### 3.1 驻外线索（Zhuwai.jsx / ZhuwaiDetail.jsx）
-- 线索编码 XW 前缀（`generateClueCode()`），转为项目后才生成区级项目编码
-- 统计卡片化（沿用统计看板卡片样式，本周新增置首、数量|金额同行）
-- 导入、分发至 5 个招商小组/副局长或 8 个园区、撤回、删除
-- 详情页：分发/编辑/转在谈/删除；已移除进展汇报、AI 摘要、进展信息模块
+### 3.1 字段语义（易踩坑）
+- 数据层：`industryCategory` = **产业类别**（短文本如'工业'）；`industryType` = **行业类别**（长文本'门类 / 大类'）
+- 表单层**相反**：`form.industryType` = 产业类别 Select、`form.industryCategory` = 行业类别级联数组；在 `doAddSave` / `handleEditOk` 中做映射交换
+- 来源地级联：内资用 `DOMESTIC_REGION_OPTIONS`、外资用 `FOREIGN_COUNTRY_OPTIONS`；`Form.useWatch('capitalNature', form)` 驱动联动；内外资 onChange 清空 sourceRegion
 
-### 3.2 招商活动线索（ZhaoshangList.jsx / ZhaoshangDetail.jsx）
-- **两级结构**：活动列表 → 活动详情（活动下的线索列表）
-- 活动字段：活动时间、是否主办单位、活动名称、活动简介、对接企业数(家)（全必填）
-- 线索编码 ZS 前缀（`generateZsClueCode()`），申报人为投促局/园区主办方人员（`ZS_REPORTERS`）
-- 删除活动校验：存在已分发或已转在谈线索时禁止删除
-- 活动详情页：头部卡片（返回/名称/编辑/删除，无分割线）+ 活动信息默认收起（CollapseToggle 梯形按钮）+ 统计卡片（5 列等宽铺满）+ 线索列表
-- 线索详情页：未做（详情按钮 message 占位）
+### 3.2 申报人 / 申报单位
+- **驻外**：`reporter`（纯姓名：陈昊/刘洋/张明/沈悦）与 `reporterOrg`（驻长三角/驻京津冀/驻粤港澳大湾区招商小组）为**独立字段**，禁止再从姓名 split 派生；导入=批量导入+投促局，新增=陈昊+驻长三角
+- **日常**：新增表单**不展示**申报人/申报单位，`doAddSave` 自动带出 `CURRENT_USER='李俊'`、`CURRENT_USER_ORG='半导体组'`
+- **活动线索**：申报单位=所属活动的申报单位
 
-### 3.3 驻外周报（WeeklyReport.jsx / WeeklyReportEdit.jsx）
-- **列表页**（默认）：顶部统计（应报 6 | 已报 | 未报）+ 周切换（←/下拉/→，最近 12 周）+ 双 Tab
-  - Tab1 汇报统计：6 张单位卡片（阴影+hover 上浮，绿=已提交/灰=未提交，摘要+查看按钮，grid 等高）
-  - Tab2 周报列表：期号/汇报单位/摘要/保存时间/操作（当周可编辑，历史仅查看；无周报期间列、无本周 Tag）
-- **编写页**（独立页面 `/overseas/weekly/edit/:id?`，非弹窗）：汇报单位只读（登录账号自动归属）、本周重点工作/下周主要工作两个富文本区块
-- 标题规则：`东湖高新区驻X办工作周报 | 2026年第N期（11月02日-11月08日）`
-- 6 个应报单位：驻沪办、驻京办、驻广办、驻长三角招商小组、驻粤港澳大湾区招商小组、驻京津冀招商小组
-- 填报规则：周一 0 点至周日 23:59:59 为当周窗口，逾期填报归属下一周（按当前自然周自动归属）
+### 3.3 责任单位（已从线索层删除）
+- 责任单位是**在谈/签约阶段的项目级字段**（ZaitanEditModal/ZhuanQianyueModal/Qianyue.jsx 等大量使用），线索文件中已全部删除，勿再加回
+- `TransferToZaitanModal.jsx` L56 读取线索 `responsibleUnits` 时对 undefined 容错返回空数组；转在谈时责任单位由**人工选择**（必填）
 
-### 3.4 其他模块（此前已完成）
-- 项目全生命周期：谋划/在谈/签约/落地/重复研判/退库，通用列表 `GenericProjectList`
-- 统计分析：签约/落地为流量指标随区间，谋划/在谈为存量；工具在 `src/utils/projectStats.js`
-- 产业情报：企业线索洞察（搜索+列表，筛选区可折叠）、关注企业、产业研报（对话式编写页）、热点榜单
-- 绩效考核、系统管理、AI 智能体场景（纯代码模板生成，不用 LLM，见 Lessons Learned）
+### 3.4 统计卡片（驻外/日常同构）
+- 六卡口径：本周新增 / 累计线索 / 已分派 / 转在谈 / 签约（绿 #52c41a，含金额）/ 落地（橙 #faad14，含金额）
+- 联动公式：已分派 = `STAT_BASE.distributed + 非待分派数 + transferredKeys.length`；转在谈 = base + 会话内转出数
+- 日常 STAT_BASE mock：total 26 / week 3 / distributed 12 / zaitan 4 / qianyue 2·3.6亿 / luodi 1·1.2亿
+- 通用 className：`zw-stat-cards` / `zw-stat-card` / `zw-stat-label` / `zw-stat-value-row` / `zw-stat-num` / `zw-stat-unit` / `zw-stat-sub`，borderLeft 4px solid color
 
-### 3.5 产业研报（2026-11-16 交互重构，IndustryReports.jsx 已删除）
-- **入口直达编写页**：`/intelligence/reports` 重定向到 `/intelligence/reports/edit`（无 id 新会话态），无独立列表页
-- **两栏布局**：左栏（新建研报 + 搜索框 + 历史研报列表）；右侧 AI 对话窗口（中间富文本编辑区已移除）；消息与输入框限宽 860px 居中（阅读列）
-- **新会话引导态**：无 id 时不创建记录，引导语含示例格式（题目；第一部分；要点）+「使用示例」一键填入；首次发送时才创建研报（标题从「题目：xxx」自动解析，无头部输入框）
-- **正文会话内输出**：大纲确认卡片流程保留；确认后正文以 type='report' 消息在会话窗口流式输出（白底卡片 + 「第X版」）；生成中发送按钮切换为停止按钮（中断保留已输出内容，可重新生成）；report.content 同步最新正文供下载
-- **引用迭代**：选中正文文字 → 自绘高亮层 + 引用气泡（原生选区易被清除，已改自绘）→ 引用块填入输入框顶部 → 发送修改要求后整篇重新生成
-- **公文格式（2026-11-17）**：模拟信源上标 `[n]` + 信源清单卡片（超链接指向官网，真实接入后替换 url）；mock 附表（表题居中、表头加粗、单倍行距、全框线）；报送行顶格 + 上下通栏分割线；正文首行缩进 2 字符。会话区用默认字体（仿宋/黑体 Web 端无法保证），公文字体仅体现在导出 HTML（正式版导 Word，PRD 见飞书「下载格式要求」）
-- 旧数据兼容：打开旧研报若无 report 消息但有 content，自动注入为第 1 版正文消息
+### 3.5 UI 硬性规范
+- 列表 `tableLayout="fixed"`、申报人列 `fixed: 'left'`
+- 表单弹窗宽 960px；通用列表组件 `components/GenericProjectList.jsx`（新增按钮文字走 `addButtonText` prop）
+- 枚举/级联/编码种子统一在 `constants/projectEnums.js`；样式常量在 `constants/uiStyles.js`
 
-## 4. 关键逻辑与组件
+### 3.6 AI 月度摘要（v2 月报段落模式，依据 docs/AI月度摘要优化方案.md）
+- 生成引擎：`utils/monthlyReport.js`（纯模板实现，真实 LLM 接入时仅需替换 `generateMonthlyReport`，保持入参/出参）
+- 输出唯一形态：可直接粘贴月报「项目洽谈」板块的**记叙文段落**（已取消四段式）；骨架：项目名(+概况句) → 本月定位+时间线 → 协同推进方面 → 问题方面 → 目前/下一步
+- 字数：目标约 210 字、硬上限 400；超限裁剪顺序：概况句 → 协同反馈 → 问题句 → 动态条数（textarea maxLength=400，单段不换行）
+- 概况句：默认按「有无早于所选月份的存档」自动判断（首次纳入自动带、续报不带）；弹窗内「含项目概况」勾选仅在**本月有总结可生成时**展示（勾选切换即重新生成草稿），本月无动态（emptyMonth）与落地关闭态不展示
+- 时间线合并：进展/系统事件/决策节点/移交按时间正序冠「X月X日」，同日多事件合并一句；'新增项目' 系统事件不参与
+- 存档与交互（v2.1 用户逐条确认）：按「项目+年月」一份，`monthlyReport.js` 内存态 store（刷新重置）；**本月**=自动生成草稿 → textarea 可编辑手动调整 → 「保存为本月总结/保存（覆盖存档）」手动归档，保存即覆盖并更新自动保存时间；「重新生成」按最新数据重置草稿（保存后覆盖上次内容）；**历史月份**=只读全文 + 复制，不提供重新生成/覆盖；提示文字仅展示「自动保存于 时间」
+- 弹窗布局：左侧月份时间线（本月置顶 + 历史存档按月倒序，点选切换、选中高亮），右侧内容区（选中月份总结，独立滚动）
+- 落地闭环：详情传入 `landedMonth`（开工/业时间所属月）；选中月份 > landedMonth 时展示「当月无进展」闭环样式（不生成、底部仅关闭、时间线本月节点标「已落地」），**已落地项目仍可查看落地前历史月报**（luodi-1 预置 2026-04/05/06 存档种子）
+- 弹窗 `components/ProgressSummaryModal.jsx` props：`projectId`（页面维度唯一主键，如 `zaitan-1`/`qianyue-1`/`luodi-1`/`mouhua-1`）、`feedbacks`（由 assignList 展平 `{unit: toDeptName, time, content}`）、`transfer`（transferStore 记录）、`intro`/`investAmount`/`industryCategory`/`capitalNature`、`landedMonth`（仅落地详情传入）
+- `seedDemoArchives()` 预置存档：zaitan-1 / qianyue-1 各「上月」一份（续报形态演示）、luodi-1 三份落地前固定月份存档（已落地查历史演示）；其余项目首次打开=首次纳入月报（自动带概况句）
 
-| 项 | 说明 |
-|---|---|
-| GenericProjectList | 通用列表组件，props：stage/filters/hiddenFilters/topFilters/statsSlot/**headerSlot**/scrollX/canImport/onImport/onAdd |
-| headerSlot | 渲染在筛选栏之前、同一 page-container 内，**解决详情页头部卡片与列表宽度不一致**（勿再嵌套 page-container） |
-| CollapseToggle + .collapse-panel | 通用折叠面板（白色梯形下凸按钮），活动详情页与企业线索洞察列表共用 |
-| TransferToZaitanModal | 转在谈弹窗，`codeLabel`/`codeValue` 参数适配不同编码来源 |
-| weeklyReportStore.js | 周报数据层：dayjs isoWeek，`weekKey=YYYY-Www` 主键，localStorage（`zhuwai_weekly_reports`）与 mock 种子合并 |
-| 闭包过期修复模式 | `distributeMapRef` + useEffect 同步（Zhuwai/ZhaoshangDetail 分发状态） |
-| 编码体系 | 驻外线索 XW+日期+3位 / 招商活动线索 ZS+日期+3位 / 转在谈生成区级项目编码 |
+### 3.7 驻外周报（2026-11-24 DEMO 调整）
+- 汇报单位固定为三个招商小组：驻长三角 / 驻粤港澳大湾区 / 驻京津冀（`mock/weeklyReportData.js` 的 `WEEKLY_UNITS`）；`weeklyReportStore` 合并 localStorage 时会过滤不在该名单的旧单位记录（口径切换防脏数据）
+- 周=ISO 自然周（周一~周日），填报始终绑定当前周；当周可编辑，跨周自动归档仅可查看；期号按「单位+年」递增
+- 填报入口唯一：列表页右上角「填写周报」按钮（便于登录账号权限收口），卡片级「去填写」入口已按用户要求移除
+- 保存规则：「本周重点工作」「下周主要工作」均为必填（标题带红星，为空逐项拦截）；同单位当周已有周报 → 直接覆盖（沿用原 id 与期号，不递增），提示「本次保存已覆盖原内容」
+- 列表宽度硬规范：与项目谋划列表同宽铺满——表格 `scroll={{x:'100%'}} + tableLayout="fixed"`（仅 tableLayout fixed 无 scroll.x 会按列宽合计收缩）、卡片水平内边距 16px；「填写周报」按钮必须绝对定位，不得与 Tabs 同 flex 行（会挤压 `.ant-tabs` 导致表格变窄、右侧留白）
 
-## 5. UI 约定（用户强偏好，务必遵守）
+### 3.8 PRD 维护规范（重要）
+- 飞书 PRD token `GTwWdOiTHoEgsGxNUyUcOMTFnwV`；字段明细**不逐字维护**（字段变动频繁，逐字列举维护不动）
+- 参考写法（同「项目谋划」节）：新增表单写「仅需填写核心字段（全部必填）」，详情写「字段明细参照 DEMO 演示」
+- **驻外线索节（2.1.5）为三类线索字段基准**，仅保留一行简短列列举；活动线索（2.1.4）与日常线索节列表列写「与驻外线索一致（含申报单位列）」
+- 每次修订在「更新记录」表加版本行（当前最新 V1.5.8，2026-11-24）
+- 消息通知（2.4.7）接收对象已角色化（V1.5.8，内嵌表 token `QfMmsFh4dhVY5it7zygcRXMXn6c` / sheet `ta8Lzy`，D 列 14 格重写）：研判/退库/考核裁决审核类固定通知超管+绩效管理员；业务类动态定位到创建人/责任填报人/发起人/目标单位绑定接口人；阶段流转与超时预警另通知办公室管理员、绩效管理员；局领导不打扰。角色口径依据《项目全生命周期角色权限表》（wiki `HUEiwZNSaiLwoskJfUecs0Pxn1g`，12 角色）；线索/周报权限用户仍在设计中，后补
 
-- 表格操作列类名 `action-col-cell`，右内边距 16px；`tableLayout="fixed"`；`scroll.x` 匹配列宽总和
-- 固定列：左 `ant-table-cell-fix-end`（v5）；序号列固定左 55px 居中
-- 表单弹窗：两列栅格、标签居左、宽 960px、gutter 24
-- 详情页：`page-container` + `table-card` + `pageCardStyle/detailHeaderStyle/detailHeaderLeftStyle`；返回按钮 type='text' marginLeft:-8；基础信息 4 列 Descriptions，分类标题 4px 蓝色左竖线
-- 按钮边框色用平台蓝 `#1677ff`（不用紫色）；筛选下拉宽度统一
-- 设计风格：非 AI 味、有设计感、过渡平滑（图片渐变融入背景）
+### 3.9 统计看板 > 本周更新概览（2026-11-25）
+- 位置：`DashboardProject.jsx` 每个主体 Tab（投促局/园区/全区）筛选卡下方、存量统计卡上方；随数据主体联动（sponsor=全部项目、park=按园区归属过滤、all=全部），固定自然周（周一 00:00~周日 23:59，同周报 isoWeek 口径），**不随统计区间筛选变化**
+- 数据层：`utils/activityStore.js`（内存 store，模式同 viewStore）——7 类事件 `progress/stageChange/decision/coopFeedback/transfer/tuiku/new`；事件结构 `{id, stage, projectId, projectName, type, summary, time}`；种子 8 条铺本周覆盖 7 类场景
+- 写入联动：详情页/组件共 13 处 `addActivity`——进展保存（4 个详情页）、决策节点通过（ZaitanDetail）、协作反馈提交（ZaitanDetail）、转签约/转在谈/转落地（stageChange）、退库申请（Qianyue 列表 + QianyueDetail）、移交确认（TransferZaitanModal / TransferQianyueModal）
+- UI：`components/WeeklyUpdatePanel.jsx`——概览行（更新项目/更新事项/本周新增项目，新增单列不混入更新口径）+ 按项目分组混排明细（项目名可下钻 `/project/{stage}/detail/{id}`、阶段 Tag、本周新增 Tag、动态条数，按最新动态倒序，maxHeight 320 内滚动）；事项行 = MM-DD + 类型 Tag + 一行摘要（时间到天、不展示操作人）
+- 园区归属：`parkOfFull` / `PARK_ORDER` 已收敛到 `utils/projectStats.js` 统一导出，页面不要再重复定义
 
-## 6. 部署流程（GitHub）
+## 4. 本轮已完成（均已 build 通过）
 
-- 仓库：`sdracheldl-ux/project_manage_demo`，本地 remote 名 `deploy`（token 已配置在 remote URL，勿提交到代码）
-- **main**：`git add frontend && git commit && git push deploy main`（只提交 frontend/，勿提交 PDF/纪要/配图/.github）
-- **gh-pages**（更新 html）：
-  ```bash
-  git worktree add --detach /tmp/pm_ghpages deploy/gh-pages
-  cd /tmp/pm_ghpages && git fetch deploy gh-pages && git reset --hard deploy/gh-pages
-  rm -rf assets index.html favicon.svg icons.svg 研报助手-*.png
-  cp -R <项目>/frontend/dist/* . && touch .nojekyll
-  git add -A && git commit -m "deploy: xxx" && git push deploy HEAD:gh-pages
-  git worktree remove /tmp/pm_ghpages --force
-  ```
-- 注意：远端 gh-pages 可能领先本地 ref，务必先 fetch + reset --hard 再覆盖
+1. **AI 月度摘要 v2 上线**（依据 `docs/AI月度摘要优化方案.md`）：四阶段（谋划/在谈/签约/落地）详情页按钮更名「AI 月度摘要」，弹窗重写为月报段落模式——月份选择器（本月生成可编辑 / 历史月份只读存档）、「含项目概况」首次自动勾选、按项目+年月存档/覆盖存档/复制、协同反馈+移交记录+决策节点融入时间线；新增 `utils/monthlyReport.js`（含上月演示种子），重写 `components/ProgressSummaryModal.jsx`，改造 MouhuaDetail / ZaitanDetail / QianyueDetail / LuodiDetail（移除旧「另存为进展汇报」，改为正式存档）
+2. **三类线索字段统一**（经用户确认取舍）：日常删投资主体/联系人/联系电话；线索层删责任单位；三类列表+详情均加「申报单位」。统一后表单 7 必填字段：项目名称/内外资/来源地/产业类别/行业类别/计划投资总额(亿元)/项目简介；列表列：序号/线索编码/申报人(fixed)/申报单位/项目名称/产业类别/行业类别/来源地/计划投资总额(亿元)/线索状态/当前负责人/申报时间/操作。涉及 6 文件：Zhuwai / ZhuwaiDetail / ZhaoshangDetail / ZhaoshangClueDetail / DailyClueList / DailyClueDetail
+3. **按钮文字**：日常线索列表「新增日常线索」、活动线索列表「新增活动线索」（按钮+弹窗标题均已改）
+4. **日常新增弹窗**：去掉申报人/申报单位展示（自动带出保留）
+5. **日常统计卡片**：对齐驻外六卡口径
+6. **日常列表**：删除顶部标题区（headerSlot 及相关样式导入）
+7. **驻外申报人 mock**：姓名与申报单位拆为独立字段（见 3.2）
+8. **PRD 字段清单同步**（飞书 token `GTwWdOiTHoEgsGxNUyUcOMTFnwV`，V1.5.5，revision 3655）：2.1.4 / 日常线索 / 2.1.5 三节字段描述按谋划式精简（见 3.8），更新记录表已加 V1.5.5 行（2026-11-23）
+9. **驻外周报 DEMO 调整**（2026-11-24）：汇报单位收敛为三个招商小组（统计/列表 mock/填报页同步），周报列表 mock 更新为本周 3 单位 2 已报 + 历史 3/2/1 递减种子；填报统一收口右上角「填写周报」+ 同周保存自动覆盖；周报列表表格宽度与项目谋划列表完全对齐（817px，实测一致），根因修复见 3.7
+10. **统计看板「本周更新概览」**（2026-11-25，客户需求）：新增板块展示本周项目动态，7 类更新场景 + 实时埋点联动，方案经 4 轮确认定稿，详见 3.9
 
-## 7. 待办事项
+## 5. 待办 / 未决事项
 
-- [ ] 招商活动线索的线索详情页（当前仅 message.info 占位，见 ZhaoshangDetail.jsx handleViewDetail）
-- [ ] 周报导出（Word/PDF，用户尚未明确提出，属潜在需求）
-- [ ] 真实系统接入时：登录账号→驻外办归属映射、后端 API 替换 localStorage
+- [ ] mock 均为内存态，刷新即重置（DEMO 定位，用户已知）
+- 无其他阻塞项
 
-> 已核实完成（勿重复开发）：周报逾期归属提示（编写页提示条已有）、热点榜单投融资事件版（InvestHotSection.jsx）
+## 6. 教训 / 注意事项
 
-## 8. 经验教训
-
-- AI 统计报告输入全为结构化数字时，纯代码模板比 LLM 生成更准、更稳、零 token 成本
-- 详情页头部卡片宽度不一致的根因是嵌套 page-container（双层 16px padding），用 headerSlot 解决
-- @ant-design/icons 无 RadarOutlined，用 AimOutlined 替代
-- git worktree 是更新 gh-pages 的安全方式；直接在主仓库 `git checkout <branch> -- .` 会污染索引
+- **Edit 批量上限 ~15 个/批**：超出部分被静默丢弃，需检查返回结果并补发
+- 工具结果偶发被清（"Results have been CLEARED"）：小步多轮重发，关键结论及时写入回复文本固化
+- 历史教训：多行 JSX 替换必须完整包含闭合结构；lark 画板必须内联 mermaid；lark-cli 结果用 python 解析 ok 字段判定

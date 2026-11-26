@@ -69,8 +69,16 @@ function load() {
   }
   const map = new Map()
   buildSeeds().forEach((s) => map.set(s.id, s))
-  // 过滤旧版本（无 id）的不兼容记录
-  local.filter((r) => r && r.id).forEach((r) => map.set(r.id, r))
+  // 本地记录优先合并：过滤已裁撤驻外办（不在 WEEKLY_UNITS）的旧记录；
+  // 同「单位+周」已存在（种子或旧记录）时先移除再写入，避免同一单位同周出现多条
+  local
+    .filter((r) => r && r.id && WEEKLY_UNITS.includes(r.unitName))
+    .forEach((r) => {
+      for (const [k, v] of map) {
+        if (v.unitName === r.unitName && v.weekKey === r.weekKey) map.delete(k)
+      }
+      map.set(r.id, r)
+    })
   return [...map.values()]
 }
 

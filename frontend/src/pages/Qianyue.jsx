@@ -24,6 +24,8 @@ import {
   DISTRICT_CODE_SEEDS,
 } from '../constants/projectEnums'
 import { useViewRole, useImported, msgStore, tuikuAuditStore, useTuikuAuditStore, useTransferStore } from '../store/viewStore'
+import AiSummaryBar, { hl } from '../components/AiSummaryBar'
+import { activityStore } from '../utils/activityStore'
 import {
   COLORS,
   actionLinkStyle,
@@ -108,6 +110,43 @@ export default function Qianyue() {
     }))
   }, [imported, audits])
 
+  // ===== 板块概述（实时统计）：让用户一眼掌握签约库核心信息 =====
+  const summary = useMemo(() => {
+    const total = dataList.length
+    const investSum = dataList.reduce((s, r) => s + (Number(r.investAmount) || 0), 0)
+    const fixedSum = dataList.reduce((s, r) => s + (Number(r.fixedInvestAmount) || 0), 0)
+    const recordSum = dataList.reduce((s, r) => s + (Number(r.recordAmount) || 0), 0)
+    // 产业类别计数（工业/服务业；农业等其余类别不计入）
+    const byCat = { 工业: 0, 服务业: 0 }
+    // 行业门类计数（行业类别（门类）字段）
+    const byType = {}
+    // 项目状态为「已开工开业」的行数，其余正在推进落地
+    let started = 0
+    dataList.forEach((r) => {
+      if (byCat[r.industryCategory] !== undefined) byCat[r.industryCategory] += 1
+      const gate = String(r.industryType || '').split(' / ')[0]
+      if (gate && gate !== '-') byType[gate] = (byType[gate] || 0) + 1
+      if (r._raw && r._raw['项目状态'] === '已开工开业') started += 1
+    })
+    const topList = Object.entries(byType).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    return { total, investSum, fixedSum, recordSum, byCat, topList, started }
+  }, [dataList])
+
+  const pctOf = (n) => (summary.total ? Math.round((n / summary.total) * 100) : 0)
+  const catText = ['工业', '服务业'].filter((c) => summary.byCat[c] > 0)
+    .map((c) => <span key={c}>{c}项目{hl(summary.byCat[c])}个</span>)
+    .reduce((acc, item, i) => (i === 0 ? [item] : [...acc, '，', item]), [])
+
+  const summaryNode = summary.total === 0 ? null : (
+    <AiSummaryBar>
+      签约项目累计{hl(summary.total)}个（含已落地），计划投资总额{hl(`${summary.investSum.toFixed(1)} 亿元`)}。其中{catText}。
+      {summary.topList.length > 0 && (
+        <span>按产业分布，占比最高为 {summary.topList[0][0]} {hl(`${summary.topList[0][1]}个（${pctOf(summary.topList[0][1])}%）`)}。</span>
+      )}
+      <span>其中固定资产投资 {hl(`${summary.fixedSum.toFixed(1)} 亿元`)}、备案办证金额 {hl(`${summary.recordSum.toFixed(1)} 亿元`)}；已开工开业 {hl(summary.started)}个，其余 {hl(summary.total - summary.started)}个正在推进落地。</span>
+    </AiSummaryBar>
+  )
+
   const handleDetail = (record) => navigate(`/project/qianyue/detail/${record.key}`)
   const handleEdit = (record) => {
     setCurrentProject(record._raw)
@@ -160,6 +199,7 @@ export default function Qianyue() {
       applicantDeptName: `${role.deptName}-${role.userName}`,
       applyTime: new Date().toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-'),
     })
+    activityStore.addActivity({ stage: 'qianyue', projectId: rec.key, projectName: rec.projectName, type: 'tuiku', summary: `提交退库申请${tuikuReason.trim() ? `：${tuikuReason.trim()}` : ''}` })
     msgStore.addMessage({
       toDeptKey: 'sponsor',
       category: 'coop',
@@ -274,6 +314,7 @@ export default function Qianyue() {
     <>
       <GenericProjectList
         stage="qianyue"
+        headerSlot={summaryNode}
         dataList={dataList}
         columns={columns}
         filters={extraFilters}

@@ -1,38 +1,25 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Tag, Tooltip, Space, Divider, Modal, Form, Input, InputNumber, Select, Cascader, Row, Col, message, Dropdown, Alert, Button, Upload, Spin } from 'antd'
-import { EyeOutlined, EditOutlined, MoreOutlined, SendOutlined, UndoOutlined, DeleteOutlined, DownloadOutlined, CheckCircleFilled, InboxOutlined } from '@ant-design/icons'
+import { Tag, Tooltip, Space, Divider, Modal, Form, Input, InputNumber, Select, Cascader, Row, Col, message, Dropdown, Button, Upload, Spin } from 'antd'
+import { EyeOutlined, EditOutlined, MoreOutlined, SendOutlined, UndoOutlined, DownloadOutlined, CheckCircleFilled, InboxOutlined, RollbackOutlined, StopOutlined } from '@ant-design/icons'
 import GenericProjectList from '../components/GenericProjectList'
+import AiSummaryBar, { hl } from '../components/AiSummaryBar'
 import TransferToZaitanModal from '../components/TransferToZaitanModal'
-import DuplicateWarningModal from '../components/DuplicateWarningModal'
 import mockData from '../mock/data.json'
-import { checkDuplicates, buildZaitanLib } from '../utils/duplicateCheck'
-import { RESPONSIBLE_UNIT_SELECT_GROUPS, RESPONSIBLE_UNIT_OPTIONS, normalizeResponsibleUnits, generateClueCode, CLUE_CODE_SEEDS } from '../constants/projectEnums'
+import { generateClueCode, CLUE_CODE_SEEDS } from '../constants/projectEnums'
 
 const { TextArea } = Input
 const { Option } = Select
 
 const actionLinkStyle = { color: '#1677ff', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 14, cursor: 'pointer' }
 
-const unitTagStyle = { background: '#e6f4ff', color: '#1677ff', border: '1px solid #91caff', borderRadius: 4, marginInlineEnd: 6 }
-
-// 责任单位渲染：空显示 '-'；每项浅蓝 Tag，最多 3 个，超出用 +N 收起
-function renderUnits(v) {
-  const list = normalizeResponsibleUnits(v)
-  if (list.length === 0) return '-'
-  const shown = list.slice(0, 3)
-  return (
-    <span>
-      {shown.map(u => <Tag key={u} style={unitTagStyle}>{u}</Tag>)}
-      {list.length > 3 && <Tag style={unitTagStyle}>+{list.length - 3}</Tag>}
-    </span>
-  )
-}
+// 线索状态样式：待分派（灰）/ 跟进中（蓝）/ 无效（红）；已转化已移出列表不展示
+const CLUE_STATUS_TAG_COLOR = { '待分派': 'default', '跟进中': 'blue', '无效': 'red' }
 
 const MOUHUA_TYPES = ['产业招商', '产业链配套', '平台招商', '以商招商']
 const MOUHUA_SOURCES = ['区级自主谋划', '市级交办', '企业主动对接', '校友资源', '楚商资源']
 
-// 分发对象：投促局招商小组（组长/负责人）
+// 分派对象：招商小组副局长（投促局招商小组组长）
 const GROUP_LEADS = [
   '半导体组·容伟',
   '化合物半导体组·周玲玲',
@@ -41,23 +28,23 @@ const GROUP_LEADS = [
   '生命健康组·黄琳',
 ]
 
-// 分发对象：园区列表（与责任单位字典中园区一致）
+// 分派对象：园区列表（园区接口人）
 const PARK_OPTIONS = [
   '未来科技城', '光谷生物城', '光谷中心城', '东湖综合保税区',
   '光电园', '服务业园', '智造园', '中华园',
 ]
 
-// 分发对象分组选项（投促局小组 + 园区）
+// 分派对象分组选项（招商小组副局长 + 园区接口人）
 const DISTRIBUTE_TARGET_GROUPS = [
-  { label: '投促局招商小组', options: GROUP_LEADS.map(g => ({ label: g, value: g })) },
-  { label: '园区', options: PARK_OPTIONS.map(p => ({ label: p, value: p })) },
+  { label: '招商小组副局长', options: GROUP_LEADS.map(g => ({ label: g, value: g })) },
+  { label: '园区接口人', options: PARK_OPTIONS.map(p => ({ label: p, value: p })) },
 ]
 
 // 线索转化统计基数（mock 历史转化，页面操作在其上实时联动）
 const STAT_BASE = {
   total: 50,       // 历史累计线索
   week: 4,         // 本周新增（历史部分）
-  distributed: 18, // 历史已分发
+  distributed: 18, // 历史已分派
   zaitan: 5,       // 历史转在谈
   qianyue: 3, qianyueAmount: 12.5,  // 历史签约（个 / 亿元）
   luodi: 1, luodiAmount: 8.0,       // 历史落地（个 / 亿元）
@@ -535,32 +522,37 @@ export default function Mouhua() {
   const [transferModalVisible, setTransferModalVisible] = useState(false)
   const [currentTransferProject, setCurrentTransferProject] = useState(null)
   const [transferredKeys, setTransferredKeys] = useState([])
-  // ===== 分发（投促局招商小组）=====
+  // ===== 线索状态机（待分派/跟进中/无效；已转化移出列表）+ 分派 =====
   const [distributeVisible, setDistributeVisible] = useState(false)
   const [distributeTarget, setDistributeTarget] = useState(null)
   const [distributeForm] = Form.useForm()
-  const [distributeMap, setDistributeMap] = useState({
-    // mock 预设已分发：基础数据第 1、3 条
-    'zhuwai-1': { lead: '半导体组·容伟', time: '2026-11-05 10:30', remark: '重点项目，请优先跟进' },
-    'zhuwai-3': { lead: '生命健康组·黄琳', time: '2026-11-08 14:20', remark: '' },
+  // clueStateMap：跟进中/无效线索的状态记录（无记录 = 待分派，负责人显示 --）
+  const [clueStateMap, setClueStateMap] = useState({
+    // mock 预设：第 1、3 条跟进中，第 4 条无效（归档前承接对象保留展示）
+    'zhuwai-1': { status: '跟进中', owner: '半导体组·容伟', time: '2026-11-05 10:30', remark: '重点项目，请优先跟进' },
+    'zhuwai-3': { status: '跟进中', owner: '生命健康组·黄琳', time: '2026-11-08 14:20', remark: '' },
+    'zhuwai-4': { status: '无效', owner: '化合物半导体组·周玲玲', time: '2026-11-02 09:10', reason: '企业明确表示近期无投资计划' },
   })
-  // columns useMemo([]) 闭包内读取最新分发记录用（避免 state 闭包过期）
-  const distributeMapRef = useRef(distributeMap)
-  useEffect(() => { distributeMapRef.current = distributeMap }, [distributeMap])
-  // ===== 删除线索 =====
-  const [deletedKeys, setDeletedKeys] = useState([])
+  // columns useMemo([]) 闭包内读取最新状态用（避免 state 闭包过期）
+  const clueStateMapRef = useRef(clueStateMap)
+  useEffect(() => { clueStateMapRef.current = clueStateMap }, [clueStateMap])
+  // ===== 撤回（分派人发起，可填备注）=====
+  const [withdrawVisible, setWithdrawVisible] = useState(false)
+  const [withdrawTarget, setWithdrawTarget] = useState(null)
+  const [withdrawForm] = Form.useForm()
+  // ===== 退回（承接方发起，必填原因）=====
+  const [returnVisible, setReturnVisible] = useState(false)
+  const [returnTarget, setReturnTarget] = useState(null)
+  const [returnForm] = Form.useForm()
+  // ===== 标记无效（必填原因，直接生效）=====
+  const [invalidVisible, setInvalidVisible] = useState(false)
+  const [invalidTarget, setInvalidTarget] = useState(null)
+  const [invalidForm] = Form.useForm()
   // ===== 导入线索（无判重）=====
   const [importVisible, setImportVisible] = useState(false)
   const [importPhase, setImportPhase] = useState('upload') // upload | processing | done
   const [importFile, setImportFile] = useState(null)
   const importTimerRef = useRef(null)
-  // ===== 实时判重（PRD 2.1.8 场景一）=====
-  const [warnVisible, setWarnVisible] = useState(false)
-  const [warnHits, setWarnHits] = useState([])
-  const [warnValues, setWarnValues] = useState(null)
-  const [l4Hits, setL4Hits] = useState([])
-  const [l4Expanded, setL4Expanded] = useState(false)
-  const l4AckRef = useRef(false) // L4 提示后放行：再次提交直接保存
   const capitalNature = Form.useWatch('capitalNature', form)
 
   const handleViewDetail = (record) => {
@@ -574,12 +566,20 @@ export default function Mouhua() {
       { capitalNature: '内资', sourceRegion: ['江苏', '苏州市'], industryType: '工业', industryCategory: ['"光芯屏端网"新一代信息技术', '先进半导体'], chainType965: ['光电子信息', '集成电路'], investorContactPerson: '许昂', investorContactPhone: '13900000003', investAmount: 1.1, projectDescription: '' },
       { capitalNature: '内资', sourceRegion: ['江苏', '南京市'], industryType: '工业', industryCategory: ['大健康和生物技术', '高端医疗器械'], chainType965: ['生命健康', '高端医疗器械'], investorContactPerson: '费良江', investorContactPhone: '13700000004', investAmount: 2, projectDescription: '' },
     ]
+    // 申报人 = 三个驻外招商小组（2026-11-17 确认）；申报人只存姓名，申报单位为独立字段
+    const REPORTERS = [
+      { name: '陈昊', org: '驻长三角招商小组' },
+      { name: '刘洋', org: '驻京津冀招商小组' },
+      { name: '张明', org: '驻粤港澳大湾区招商小组' },
+      { name: '沈悦', org: '驻长三角招商小组' },
+    ]
     const base = mockData.zaitan.slice(0, 4).map((item, idx) => ({
       key: `zhuwai-${idx + 1}`,
       index: idx + 1,
       clueCode: CLUE_CODE_SEEDS[idx % CLUE_CODE_SEEDS.length],
-      reporter: item['申报人'] || '-',
-      projectStatus: '谋划中',
+      reporter: REPORTERS[idx].name,
+      reporterOrg: REPORTERS[idx].org,
+      projectStatus: '跟进中',
       projectName: item['项目名称'] || '-',
       sourceArea: item['来源地'] || '-',
       industryCategory: item['产业类别'] || '-',
@@ -587,32 +587,69 @@ export default function Mouhua() {
       projectDesc: item['项目简介'] || '-',
       investorEntity: item['投资主体'] || '-',
       investAmount: item['投资金额（亿元）'] || mockFormValues[idx].investAmount,
-      responsibleUnits: [RESPONSIBLE_UNIT_OPTIONS[idx % RESPONSIBLE_UNIT_OPTIONS.length]],
       enterpriseNature: item['企业性质'] || '-',
       mouhuaType: MOUHUA_TYPES[idx % MOUHUA_TYPES.length],
       mouhuaSource: MOUHUA_SOURCES[idx % MOUHUA_SOURCES.length],
       reportTime: item['申报时间'] || '-',
-      auditStatus: idx < 2 ? '已审核通过' : '待审核',
       projectCategory: ['政策类', '投资类', '供地类', '其他'][idx % 4],
       _formValues: mockFormValues[idx],
     }))
     return [...base, ...extraDataList]
-      .filter(item => !transferredKeys.includes(item.key) && !deletedKeys.includes(item.key))
+      .filter(item => !transferredKeys.includes(item.key))
       .map(item => {
-        const dist = distributeMap[item.key]
+        const st = clueStateMap[item.key]
         return {
           ...item,
-          distributedTo: dist?.lead || '',
-          distributedTime: dist?.time || '',
-          distributeStatus: dist ? '已分发' : '未分发',
+          reporterOrg: item.reporterOrg, // 申报单位 = 申报人所属驻外小组（独立字段）
+          clueStatus: st?.status || '待分派',
+          currentOwner: st?.owner || '',
+          assignedTime: st?.time || '',
         }
       })
-  }, [extraDataList, transferredKeys, deletedKeys, distributeMap])
+  }, [extraDataList, transferredKeys, clueStateMap])
+
+  // ===== 板块概述（实时统计）：数字口径与顶部统计卡完全一致 =====
+  const summary = useMemo(() => {
+    const total = STAT_BASE.total + dataList.length // 累计线索：同「累计线索」卡片
+    const week = STAT_BASE.week + extraDataList.length // 本周新增：同「本周新增」卡片
+    const zaitan = STAT_BASE.zaitan + transferredKeys.length // 转在谈：同「转在谈」卡片
+    const investSum = dataList.reduce((s, r) => s + (Number(r.investAmount) || 0), 0)
+    // 来源地计数（sourceArea 为「省-市」或「省 / 市」，取省级名称）
+    const byRegion = {}
+    // 行业门类计数（industryType 为「门类 / 大类」拼接，取门类部分）
+    const byType = {}
+    dataList.forEach((r) => {
+      const region = String(r.sourceArea || '').split(/[-/]/)[0].trim()
+      if (region && region !== '-') byRegion[region] = (byRegion[region] || 0) + 1
+      const gate = String(r.industryType || '').split(' / ')[0].trim()
+      if (gate && gate !== '-') byType[gate] = (byType[gate] || 0) + 1
+    })
+    const topNames = (map, n) => Object.entries(map)
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, n).map(([name]) => name)
+    const rate = total > 0 ? Math.round((STAT_BASE.qianyue / total) * 100) : null
+    return { total, week, zaitan, investSum, topRegions: topNames(byRegion, 3), topIndustries: topNames(byType, 2), rate }
+  }, [dataList])
+
+  // 来源地区 / 产业方向分句：无数据时省略对应内容
+  const regionText = summary.topRegions.length > 0 ? `线索主要来源于 ${summary.topRegions.join('、')} 等地区` : ''
+  const industryText = summary.topIndustries.length > 0 ? `集中于 ${summary.topIndustries.join('、')} 等产业方向` : ''
+  const distText = [regionText, industryText].filter(Boolean).join('，')
+
+  const summaryNode = (
+    <AiSummaryBar>
+      {hl(3)}个招商小组累计报送线索{hl(summary.total)}条，本周新增{hl(summary.week)}条，计划投资总额合计{hl(`${summary.investSum.toFixed(1)} 亿元`)}
+      {distText && <span>；{distText}</span>}
+      ；累计转化在谈{hl(summary.zaitan)}个，签约{hl(STAT_BASE.qianyue)}个（金额{hl(`${STAT_BASE.qianyueAmount} 亿元`)}）、落地{hl(STAT_BASE.luodi)}个（金额{hl(`${STAT_BASE.luodiAmount} 亿元`)}）
+      {summary.rate != null && <span>，签约转化率{hl(`${summary.rate}%`)}</span>}。
+    </AiSummaryBar>
+  )
 
   const columns = useMemo(() => [
     { key: 'index', title: '序号', dataIndex: 'index', width: 55, align: 'center', fixed: 'left', required: true },
     { key: 'clueCode', title: '线索编码', dataIndex: 'clueCode', width: 140, align: 'center' },
-    { key: 'reporter', title: '申报人', dataIndex: 'reporter', width: 120, align: 'left', fixed: 'left', ellipsis: true },
+    { key: 'reporter', title: '申报人', dataIndex: 'reporter', width: 120, align: 'center', fixed: 'left', ellipsis: true },
+    { key: 'reporterOrg', title: '申报单位', dataIndex: 'reporterOrg', width: 150, align: 'center', ellipsis: true },
     { key: 'projectName', title: '项目名称', dataIndex: 'projectName', width: 220, ellipsis: true, required: true,
       render: (v, record) => (
         <Tooltip title={v}>
@@ -626,43 +663,41 @@ export default function Mouhua() {
     { key: 'investAmount', title: '计划投资总额(亿元)', dataIndex: 'investAmount', width: 140, align: 'right', sorter: true,
       render: (v) => <span style={{ fontWeight: 600 }}>{Number(v).toFixed(2)}</span>
     },
-    { key: 'responsibleUnits', title: '责任单位', dataIndex: 'responsibleUnits', width: 220, ellipsis: true,
-      render: (v) => renderUnits(v)
-    },
-    { key: 'distributeStatus', title: '分发状态', dataIndex: 'distributeStatus', width: 90, align: 'center',
+    { key: 'clueStatus', title: '线索状态', dataIndex: 'clueStatus', width: 90, align: 'center',
       render: (v) => (
-        <Tag style={{ margin: 0 }} color={v === '已分发' ? 'blue' : 'default'}>{v}</Tag>
+        <Tag style={{ margin: 0 }} color={CLUE_STATUS_TAG_COLOR[v] || 'default'}>{v}</Tag>
       ),
     },
-    { key: 'distributedTo', title: '分发对象', dataIndex: 'distributedTo', width: 150, align: 'center',
+    { key: 'currentOwner', title: '当前负责人', dataIndex: 'currentOwner', width: 150, align: 'center',
       render: (v, record) => v ? (
-        <Tooltip title={`${record.distributedTime || ''}${record.distributedTime ? ' 分发' : ''}`}>
+        <Tooltip title={`${record.assignedTime || ''}${record.assignedTime ? ' 分派' : ''}`}>
           <span>{v}</span>
         </Tooltip>
-      ) : <span style={{ color: '#bfbfbf' }}>-</span>,
+      ) : <span style={{ color: '#bfbfbf' }}>--</span>,
     },
     { key: 'reportTime', title: '申报时间', dataIndex: 'reportTime', width: 120, align: 'center' },
     { key: 'action', title: '操作', dataIndex: 'action', width: 200, fixed: 'right', align: 'center', required: true,
       render: (_, record) => {
+        const status = clueStateMapRef.current[record.key]?.status || '待分派'
+        const st = clueStateMapRef.current[record.key]
+        // 无效：只读归档，仅可查看详情
+        if (status === '无效') {
+          return (
+            <span style={actionLinkStyle} onClick={() => handleViewDetail(record)}>
+              <EyeOutlined /> 详情
+            </span>
+          )
+        }
         const moreMenuItems = [
+          ...(status === '跟进中' ? [
+            { key: 'return', icon: <RollbackOutlined />, label: '退回' },
+            { key: 'invalidate', icon: <StopOutlined />, label: '标记无效' },
+            { type: 'divider' },
+          ] : []),
           { key: 'transfer', icon: <EditOutlined />, label: '转在谈' },
-          { type: 'divider' },
-          { key: 'delete', icon: <DeleteOutlined />, label: '删除线索', danger: true },
         ]
         const handleMoreClick = (e) => {
-          if (e.key === 'delete') {
-            Modal.confirm({
-              title: '删除线索',
-              content: `确定删除线索「${record.projectName}」吗？删除后不可恢复。`,
-              okText: '删除',
-              okButtonProps: { danger: true },
-              cancelText: '取消',
-              onOk: () => {
-                setDeletedKeys(prev => [...prev, record.key])
-                message.success('线索已删除')
-              },
-            })
-          } else if (e.key === 'transfer') {
+          if (e.key === 'transfer') {
             Modal.confirm({
               title: '转在谈',
               content: `确定将驻外线索「${record.projectName}」转入在谈阶段吗？需要补充在谈阶段必填字段。`,
@@ -672,6 +707,14 @@ export default function Mouhua() {
                 setTransferModalVisible(true)
               },
             })
+          } else if (e.key === 'return') {
+            setReturnTarget(record)
+            returnForm.resetFields()
+            setReturnVisible(true)
+          } else if (e.key === 'invalidate') {
+            setInvalidTarget(record)
+            invalidForm.resetFields()
+            setInvalidVisible(true)
           }
         }
         return (
@@ -679,15 +722,16 @@ export default function Mouhua() {
             <span style={actionLinkStyle} onClick={() => handleViewDetail(record)}>
               <EyeOutlined /> 详情
             </span>
-            {record.distributedTo ? (
-              <Tooltip title={`撤回上次分发（${record.distributedTo} · ${record.distributedTime || ''}），撤回后可重新分发`}>
-                <span style={actionLinkStyle} onClick={() => handleRevokeDistribute(record)}>
+            {status === '跟进中' ? (
+              // 撤回：分派人视角（demo 恒显演示；真实系统与承接方「退回」按角色互斥显示）
+              <Tooltip title={`撤回分派（${st?.owner || ''} · ${st?.time || ''}），撤回后线索回待分派，可再次分派`}>
+                <span style={actionLinkStyle} onClick={() => { setWithdrawTarget(record); withdrawForm.resetFields(); setWithdrawVisible(true) }}>
                   <UndoOutlined /> 撤回
                 </span>
               </Tooltip>
             ) : (
               <span style={actionLinkStyle} onClick={() => handleOpenDistribute(record)}>
-                <SendOutlined /> 分发
+                <SendOutlined /> 分派
               </span>
             )}
             <Dropdown menu={{ items: moreMenuItems, onClick: handleMoreClick }} trigger={['click']}>
@@ -701,55 +745,86 @@ export default function Mouhua() {
     },
   ], [])
 
-  const extraFilters = [
-    { key: 'responsibleUnits', dataIndex: 'responsibleUnits', label: '责任单位', type: 'select', multiple: true, options: RESPONSIBLE_UNIT_SELECT_GROUPS },
-  ]
-
-  // 主筛选行附加筛选项：分发状态
+  // 主筛选行附加筛选项：主行放不下时收进展开区（expanded: true 渲染在展开/收起区域）
   const topFilters = [
-    { key: 'distributeStatus', dataIndex: 'distributeStatus', label: '分发状态', width: 140,
-      options: [{ label: '未分发', value: '未分发' }, { label: '已分发', value: '已分发' }] },
+    { key: 'reporterOrg', dataIndex: 'reporterOrg', label: '申报单位', width: 170, expanded: true,
+      options: [
+        { label: '驻长三角招商小组', value: '驻长三角招商小组' },
+        { label: '驻京津冀招商小组', value: '驻京津冀招商小组' },
+        { label: '驻粤港澳大湾区招商小组', value: '驻粤港澳大湾区招商小组' },
+      ] },
+    { key: 'clueStatus', dataIndex: 'clueStatus', label: '线索状态', width: 140, expanded: true,
+      options: [{ label: '待分派', value: '待分派' }, { label: '跟进中', value: '跟进中' }, { label: '无效', value: '无效' }] },
   ]
 
-  // ===== 分发 =====
+  // ===== 分派（待分派 → 跟进中）=====
   const handleOpenDistribute = (record) => {
     setDistributeTarget(record)
-    const dist = distributeMapRef.current[record.key]
-    distributeForm.setFieldsValue({ lead: dist?.lead, remark: dist?.remark || '' })
+    distributeForm.resetFields()
     setDistributeVisible(true)
   }
 
   const handleDistributeOk = async () => {
     try {
       const values = await distributeForm.validateFields()
-      setDistributeMap(prev => ({
+      const time = new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16).replace('/', '-').replace('/', '-')
+      setClueStateMap(prev => ({
         ...prev,
-        [distributeTarget.key]: { lead: values.lead, time: new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16).replace('/', '-').replace('/', '-'), remark: values.remark || '' },
+        [distributeTarget.key]: { status: '跟进中', owner: values.lead, time, remark: values.remark || '' },
       }))
       setDistributeVisible(false)
-      message.success(`已分发至 ${values.lead}`)
+      message.success(`已分派至 ${values.lead}，线索进入跟进中`)
     } catch (e) {
       // validation
     }
   }
 
-  /** 撤回上次分发（操作列直接触发），撤回后可重新分发 */
-  const handleRevokeDistribute = (record) => {
-    Modal.confirm({
-      title: '撤回分发',
-      content: `确定撤回「${record.projectName}」的分发记录（${record.distributedTo}）吗？撤回后可重新分发。`,
-      okText: '撤回',
-      okButtonProps: { danger: true },
-      cancelText: '取消',
-      onOk: () => {
-        setDistributeMap(prev => {
-          const next = { ...prev }
-          delete next[record.key]
-          return next
-        })
-        message.success('已撤回分发，可重新分发')
-      },
-    })
+  // ===== 撤回（分派人发起，可填备注；跟进中 → 待分派）=====
+  const handleWithdrawOk = async () => {
+    try {
+      const values = await withdrawForm.validateFields()
+      setClueStateMap(prev => {
+        const next = { ...prev }
+        delete next[withdrawTarget.key]
+        return next
+      })
+      setWithdrawVisible(false)
+      message.success(values.remark ? `已撤回分派（${values.remark}），线索回待分派，可再次分派` : '已撤回分派，线索回待分派，可再次分派')
+    } catch (e) {
+      // validation
+    }
+  }
+
+  // ===== 退回（承接方发起，必填原因；跟进中 → 待分派，回到分派人）=====
+  const handleReturnOk = async () => {
+    try {
+      const values = await returnForm.validateFields()
+      setClueStateMap(prev => {
+        const next = { ...prev }
+        delete next[returnTarget.key]
+        return next
+      })
+      setReturnVisible(false)
+      message.success('线索已退回至分派人，分派人可再次分派')
+    } catch (e) {
+      // validation
+    }
+  }
+
+  // ===== 标记无效（必填原因，直接生效；→ 无效只读归档）=====
+  const handleInvalidOk = async () => {
+    try {
+      const values = await invalidForm.validateFields()
+      const time = new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, 16).replace('/', '-').replace('/', '-')
+      setClueStateMap(prev => ({
+        ...prev,
+        [invalidTarget.key]: { status: '无效', owner: prev[invalidTarget.key]?.owner || '', time, reason: values.reason },
+      }))
+      setInvalidVisible(false)
+      message.success('线索已标记无效，进入无效池只读归档')
+    } catch (e) {
+      // validation
+    }
   }
 
   // ===== 导入（无判重）=====
@@ -774,7 +849,8 @@ export default function Mouhua() {
         index: 0,
         clueCode: generateClueCode(),
         reporter: '批量导入',
-        projectStatus: '谋划中',
+        reporterOrg: '投促局',
+        projectStatus: '待分派',
         projectName: name,
         sourceArea: ['上海-上海市', '广东-深圳市', '江苏-苏州市', '北京-北京市', '浙江-杭州市'][i % 5],
         industryCategory: ['"光芯屏端网"新一代信息技术', '超级计算和人工智能', '新能源', '大健康和生物技术'][i % 4],
@@ -782,12 +858,10 @@ export default function Mouhua() {
         projectDesc: `${name}（批量导入线索）`,
         investorEntity: `${name.slice(0, 6)}有限公司`,
         investAmount: [1.2, 2.5, 0.8, 3.6, 1.8, 5.2, 0.6, 2.0][i % 8],
-        responsibleUnits: [RESPONSIBLE_UNIT_OPTIONS[i % RESPONSIBLE_UNIT_OPTIONS.length]],
         enterpriseNature: '内资',
         mouhuaType: MOUHUA_TYPES[i % MOUHUA_TYPES.length],
         mouhuaSource: '企业主动对接',
         reportTime: new Date().toISOString().slice(0, 10),
-        auditStatus: '待审核',
         projectCategory: ['投资类', '政策类', '其他'][i % 3],
         _formValues: {},
       }))
@@ -798,9 +872,6 @@ export default function Mouhua() {
 
   const handleAdd = () => {
     form.resetFields()
-    setL4Hits([])
-    setL4Expanded(false)
-    l4AckRef.current = false
     setAddModalVisible(true)
   }
 
@@ -813,7 +884,7 @@ export default function Mouhua() {
     message.success('已转为在谈项目并生成区级项目编码，该项目已移出驻外线索列表')
   }
 
-  // 执行保存（判重通过 / L4 放行 / 预警「仍要提交」后调用）
+  // 执行保存（2026-11-17 确认：线索新增不判重，由转在谈环节把关）
   const doAddSave = async (values) => {
     try {
       setAddLoading(true)
@@ -830,28 +901,24 @@ export default function Mouhua() {
         key: `zhuwai-new-${Date.now()}`,
         index: dataList.length + 1,
         clueCode,
-        reporter: '投促局管理员',
-        projectStatus: '谋划中',
+        reporter: '陈昊',
+        reporterOrg: '驻长三角招商小组',
+        projectStatus: '待分派',
         projectName: values.projectName,
         sourceArea: sourceLabel,
         industryCategory: values.industryType,
         industryType: industryLabel,
         projectDesc: values.projectDescription,
         investAmount: values.investAmount,
-        responsibleUnits: values.responsibleUnits || [],
         enterpriseNature: '-',
         mouhuaSource: '区级自主谋划',
         reportTime: timeStr,
-        auditStatus: '待审核',
         _formValues: { ...values },
       }
       setExtraDataList(prev => [newItem, ...prev])
       message.success(`驻外线索新增成功，线索编码：${clueCode}（转为项目后将生成区级项目编码）`)
       setAddModalVisible(false)
       form.resetFields()
-      setL4Hits([])
-      setL4Expanded(false)
-      l4AckRef.current = false
     } finally {
       setAddLoading(false)
     }
@@ -860,55 +927,10 @@ export default function Mouhua() {
   const handleAddOk = async () => {
     try {
       const values = await form.validateFields()
-      // ===== 实时判重（PRD 2.1.8 场景一）：比对谋划库 + 在谈库，提交结果不进入研判池 =====
-      const now = new Date()
-      const pad = (n) => String(n).padStart(2, '0')
-      const hits = checkDuplicates({
-        projectName: values.projectName,
-        investAmount: values.investAmount,
-        industryCategory: values.industryType || '',
-        industryType: values.industryCategory ? values.industryCategory.join(' / ') : '',
-        reporter: '投促局管理员',
-        reportTime: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
-      }, [
-        { stage: '谋划', rows: dataList },
-        { stage: '在谈', rows: buildZaitanLib() },
-      ])
-      const strongHits = hits.filter(h => h.level !== 'L4')
-      const l4Only = hits.filter(h => h.level === 'L4')
-      if (strongHits.length > 0) {
-        // L1 阻断 / L2·L3 二选一（预警弹窗）
-        setWarnValues(values)
-        setWarnHits(hits)
-        setWarnVisible(true)
-        return
-      }
-      if (l4Only.length > 0 && !l4AckRef.current) {
-        // L4 弱提示：表单保持打开，顶部提示条，可展开冲突列表；再次提交直接保存
-        l4AckRef.current = true
-        setL4Hits(l4Only)
-        setL4Expanded(false)
-        message.warning('检测到与库中项目存在弱相似信号，建议核实是否重复；确认无误可再次提交')
-        return
-      }
       await doAddSave(values)
     } catch (err) {
       // validation error, do nothing
     }
-  }
-
-  const handleWarnReturn = () => {
-    setWarnVisible(false)
-    setWarnHits([])
-    setWarnValues(null)
-  }
-
-  const handleWarnForce = async () => {
-    setWarnVisible(false)
-    setWarnHits([])
-    const values = warnValues
-    setWarnValues(null)
-    if (values) await doAddSave(values)
   }
 
   const formItemLayout = {
@@ -917,12 +939,13 @@ export default function Mouhua() {
   }
 
   // 顶部统计卡片（转化漏斗：基数 + 会话操作实时联动），渲染在筛选栏与列表之间
-  const distributedCount = STAT_BASE.distributed + dataList.filter(i => i.distributedTo).length
+  // 已分派 = 当前跟进中 + 无效（被分派过）+ 会话内转出数
+  const distributedCount = STAT_BASE.distributed + dataList.filter(i => i.clueStatus !== '待分派').length + transferredKeys.length
   // 卡片配色沿用统计看板：线索类蓝色、签约绿色、落地橙色
   const statItems = [
     { label: '本周新增', value: STAT_BASE.week + extraDataList.length, unit: '条', color: '#1677ff' },
     { label: '累计线索', value: STAT_BASE.total + dataList.length, unit: '条', color: '#1677ff' },
-    { label: '已分发', value: distributedCount, unit: '条', color: '#1677ff' },
+    { label: '已分派', value: distributedCount, unit: '条', color: '#1677ff' },
     { label: '转在谈', value: STAT_BASE.zaitan + transferredKeys.length, unit: '个', color: '#1677ff' },
     { label: '签约', value: STAT_BASE.qianyue, unit: '个', sub: `金额 ${STAT_BASE.qianyueAmount} 亿元`, color: '#52c41a' },
     { label: '落地', value: STAT_BASE.luodi, unit: '个', sub: `金额 ${STAT_BASE.luodiAmount} 亿元`, color: '#faad14' },
@@ -955,10 +978,10 @@ export default function Mouhua() {
         nextStageText="在谈"
         dataList={dataList}
         columns={columns}
-        filters={extraFilters}
         topFilters={topFilters}
         statsSlot={statsSlot}
-        scrollX={1840}
+        headerSlot={summaryNode}
+        scrollX={1620}
         canAdd={true}
         canImport={true}
         onImport={handleImport}
@@ -978,33 +1001,6 @@ export default function Mouhua() {
         bodyStyle={{ padding: '24px', maxHeight: '70vh', overflowY: 'auto' }}
       >
         <Form form={form} {...formItemLayout} layout="horizontal" requiredMark={true} colon={false}>
-          {/* L4 弱提示：不阻断，可展开冲突项目列表（名称/阶段/链接） */}
-          {l4Hits.length > 0 && (
-            <Alert
-              type="info"
-              showIcon
-              style={{ marginBottom: 16 }}
-              message="检测到与库中项目存在弱相似信号，建议核实是否重复"
-              action={
-                <Button type="link" size="small" onClick={() => setL4Expanded(!l4Expanded)}>
-                  {l4Expanded ? '收起' : '展开冲突项目'}
-                </Button>
-              }
-              description={l4Expanded ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {l4Hits.map((h, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <a onClick={() => { setAddModalVisible(false); setWarnVisible(false); navigate(`/project/${h.target.stage === '在谈' ? 'zaitan' : 'mouhua'}/detail/${h.target.key}`) }}>
-                        {h.target.projectName}
-                      </a>
-                      <Tag bordered={false}>{h.target.stageLabel}</Tag>
-                      <span style={{ color: '#8c8c8c', fontSize: 12 }}>{h.reason}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : undefined}
-            />
-          )}
           <Row gutter={24}>
             <Col span={12}>
               <Form.Item label="项目名称" name="projectName" rules={[{ required: true, message: '请输入项目名称' }, { max: 40, message: '项目名称不超过40个字符' }]}>
@@ -1051,11 +1047,6 @@ export default function Mouhua() {
                 <InputNumber style={{ width: '100%' }} placeholder="请输入" min={0} precision={2} addonAfter="亿元" />
               </Form.Item>
             </Col>
-            <Col span={12}>
-              <Form.Item label="责任单位" name="responsibleUnits" rules={[{ required: true, message: '请选择责任单位（至少1个）' }]}>
-                <Select mode="multiple" options={RESPONSIBLE_UNIT_SELECT_GROUPS} placeholder="请选择责任单位" showSearch allowClear maxTagCount="responsive" />
-              </Form.Item>
-            </Col>
             <Col span={24}>
               <Form.Item label="项目简介" name="projectDescription" labelCol={{ span: 4 }} wrapperCol={{ span: 20 }} rules={[{ required: true, message: '请输入项目简介' }, { max: 999, message: '项目简介不超过999个字符' }]}>
                 <TextArea rows={4} placeholder="请输入项目简介，最多999字" maxLength={999} showCount />
@@ -1073,23 +1064,13 @@ export default function Mouhua() {
         codeValue={currentTransferProject?.clueCode}
       />
 
-      {/* 实时判重预警弹窗（L1 阻断 / L2·L3 二选一） */}
-      <DuplicateWarningModal
-        open={warnVisible}
-        hits={warnHits}
-        contextTitle="新增驻外线索"
-        onReturn={handleWarnReturn}
-        onForce={handleWarnForce}
-        onCloseAll={() => { setAddModalVisible(false); setWarnVisible(false) }}
-      />
-
-      {/* 分发线索弹窗（分发至投促局招商小组；撤回由操作列「撤回」按钮触发） */}
+      {/* 分派线索弹窗（待分派 → 跟进中；接收对象：招商小组副局长 / 园区接口人） */}
       <Modal
-        title="分发线索"
+        title="分派线索"
         open={distributeVisible}
         onOk={handleDistributeOk}
         onCancel={() => setDistributeVisible(false)}
-        okText="确认分发"
+        okText="确认分派"
         cancelText="取消"
         width={560}
         destroyOnClose
@@ -1099,14 +1080,87 @@ export default function Mouhua() {
         </div>
         <Form form={distributeForm} layout="vertical" requiredMark={true}>
           <Form.Item
-            label="分发对象"
+            label="分派对象"
             name="lead"
-            rules={[{ required: true, message: '请选择分发对象' }]}
+            rules={[{ required: true, message: '请选择分派对象' }]}
           >
-            <Select placeholder="请选择投促局招商小组或园区" options={DISTRIBUTE_TARGET_GROUPS} />
+            <Select placeholder="请选择招商小组副局长或园区接口人" options={DISTRIBUTE_TARGET_GROUPS} />
           </Form.Item>
-          <Form.Item label="分发备注" name="remark">
-            <TextArea rows={3} placeholder="请输入分发备注（选填）" maxLength={200} showCount />
+          <Form.Item label="分派备注" name="remark">
+            <TextArea rows={3} placeholder="请输入分派备注（选填）" maxLength={200} showCount />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 撤回弹窗（分派人发起，可填备注；线索回待分派可再次分派） */}
+      <Modal
+        title="撤回分派"
+        open={withdrawVisible}
+        onOk={handleWithdrawOk}
+        onCancel={() => setWithdrawVisible(false)}
+        okText="确认撤回"
+        okButtonProps={{ danger: true }}
+        cancelText="取消"
+        width={560}
+        destroyOnClose
+      >
+        <div style={{ marginBottom: 16 }}>
+          确定撤回「<strong>{withdrawTarget?.projectName}</strong>」的分派（{withdrawTarget?.currentOwner} · {withdrawTarget?.assignedTime || ''}）吗？撤回后线索回到「待分派」，可再次分派。
+        </div>
+        <Form form={withdrawForm} layout="vertical">
+          <Form.Item label="撤回备注" name="remark">
+            <TextArea rows={3} placeholder="请输入撤回备注（选填）" maxLength={200} showCount />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 退回弹窗（承接方发起，必填原因；退回至分派人） */}
+      <Modal
+        title="退回线索"
+        open={returnVisible}
+        onOk={handleReturnOk}
+        onCancel={() => setReturnVisible(false)}
+        okText="确认退回"
+        cancelText="取消"
+        width={560}
+        destroyOnClose
+      >
+        <div style={{ marginBottom: 16 }}>
+          线索「<strong>{returnTarget?.projectName}</strong>」将退回至分派人，退回后分派人可再次分派。
+        </div>
+        <Form form={returnForm} layout="vertical" requiredMark={true}>
+          <Form.Item
+            label="退回原因"
+            name="reason"
+            rules={[{ required: true, message: '请输入退回原因' }, { max: 200, message: '退回原因不超过200字' }]}
+          >
+            <TextArea rows={3} placeholder="请输入退回原因（必填）" maxLength={200} showCount />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 标记无效弹窗（必填原因，直接生效；进入无效池只读归档） */}
+      <Modal
+        title="标记无效"
+        open={invalidVisible}
+        onOk={handleInvalidOk}
+        onCancel={() => setInvalidVisible(false)}
+        okText="确认标记"
+        okButtonProps={{ danger: true }}
+        cancelText="取消"
+        width={560}
+        destroyOnClose
+      >
+        <div style={{ marginBottom: 16 }}>
+          线索「<strong>{invalidTarget?.projectName}</strong>」标记无效后进入无效池只读归档，不再流转，且不提供重新启用。
+        </div>
+        <Form form={invalidForm} layout="vertical" requiredMark={true}>
+          <Form.Item
+            label="无效原因"
+            name="reason"
+            rules={[{ required: true, message: '请输入无效原因' }, { max: 200, message: '无效原因不超过200字' }]}
+          >
+            <TextArea rows={3} placeholder="请输入无效原因（必填，直接生效不复核）" maxLength={200} showCount />
           </Form.Item>
         </Form>
       </Modal>
@@ -1157,7 +1211,7 @@ export default function Mouhua() {
             <div style={{ fontSize: 16, fontWeight: 600, color: '#262626', marginTop: 12 }}>
               导入完成，成功导入 8 条线索
             </div>
-            <div style={{ fontSize: 13, color: '#8c8c8c', marginTop: 4 }}>线索已加入列表，可继续分发或转入在谈</div>
+            <div style={{ fontSize: 13, color: '#8c8c8c', marginTop: 4 }}>线索已加入列表（状态：待分派），可继续分派或转入在谈</div>
             <Button type="primary" style={{ marginTop: 20 }} onClick={closeImport}>完成</Button>
           </div>
         )}

@@ -21,6 +21,7 @@ import TransferZaitanModal from '../components/TransferZaitanModal'
 import ProgressTimeline from '../components/ProgressTimeline'
 import ProgressSummaryModal from '../components/ProgressSummaryModal'
 import { useViewRole, msgStore, transferStore, useTransferStore } from '../store/viewStore'
+import { activityStore } from '../utils/activityStore'
 import { findUnitByKey } from '../constants/assignConfig'
 import { RESPONSIBLE_UNIT_OPTIONS, normalizeResponsibleUnits, DISTRICT_CODE_SEEDS } from '../constants/projectEnums'
 import {
@@ -389,6 +390,7 @@ export default function ZaitanDetail() {
         ])
         message.success('进展已添加')
       }
+      activityStore.addActivity({ stage: 'zaitan', projectId: project.key, projectName: project.projectName, type: 'progress', summary: values.content })
       setProgressModalVisible(false)
       progressForm.resetFields()
     } catch (e) {
@@ -419,6 +421,10 @@ export default function ZaitanDetail() {
         type: PROGRESS_TYPE.DECISION,
       }))
       setProgressList(prev => [...records, ...prev])
+      // 本周动态：决策节点通过事件
+      changes.filter(c => c.action === 'pass').forEach(c => {
+        activityStore.addActivity({ stage: 'zaitan', projectId: project.key, projectName: project.projectName, type: 'decision', summary: `决策节点「${c.label}」已通过` })
+      })
     }
   }
 
@@ -529,6 +535,7 @@ export default function ZaitanDetail() {
       type: 'feedback',
     })
     message.success('反馈已提交')
+    activityStore.addActivity({ stage: 'zaitan', projectId: project.key, projectName: project.projectName, type: 'coopFeedback', summary: '协作单位已提交配合处理结果' })
     setFeedbackModalVisible(false)
     setFeedbackTarget(null)
   }
@@ -579,7 +586,7 @@ export default function ZaitanDetail() {
                   进展汇报
                 </Button>
                 <Button className="ai-grad-btn" icon={<RobotOutlined />} onClick={() => setAiVisible(true)}>
-                  AI 摘要
+                  AI 月度摘要
                 </Button>
                 {canUpdateDecision && (
                   <Button icon={<SettingOutlined />} onClick={() => setDecisionModalVisible(true)}>
@@ -963,6 +970,7 @@ export default function ZaitanDetail() {
           ])
           message.success('转签约成功！项目已进入签约阶段')
           setZhuanQianyueVisible(false)
+          activityStore.addActivity({ stage: 'zaitan', projectId: project.key, projectName: project.projectName, type: 'stageChange', summary: '由「在谈」阶段转入「签约」' })
           setTimeout(() => navigate('/project/qianyue'), 800)
         }}
       />
@@ -1024,26 +1032,22 @@ export default function ZaitanDetail() {
         </div>
       </Modal>
 
-      {/* AI 月度进展摘要弹窗（严格按当前自然月） */}
+      {/* AI 月度摘要弹窗（月报段落模式，按项目+年月存档；含协同反馈与移交记录） */}
       <ProgressSummaryModal
         open={aiVisible}
         onCancel={() => setAiVisible(false)}
+        projectId={`zaitan-${project.key}`}
         projectName={project.projectName}
         stageLabel="在谈阶段"
         items={progressList}
-        onSave={(content) => {
-          const now = new Date()
-          const pad2 = (n) => String(n).padStart(2, '0')
-          const ts = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())} ${pad2(now.getHours())}:${pad2(now.getMinutes())}`
-          setProgressList((prev) => [{
-            id: `ai-${Date.now()}`,
-            content,
-            reporter: role.userName || CURRENT_USER,
-            updateTime: ts,
-            type: PROGRESS_TYPE.NORMAL,
-            stage: '在谈阶段',
-          }, ...prev])
-        }}
+        feedbacks={assignList.flatMap((a) =>
+          (a.feedbacks || []).map((fb) => ({ unit: a.toDeptName, time: fb.time, content: fb.content })),
+        )}
+        transfer={transferStore.getTransferByProject(project.key)}
+        intro={project.projectDesc}
+        investAmount={project.investAmount}
+        industryCategory={project.industryCategory}
+        capitalNature={project.domesticForeign}
       />
     </div>
   )

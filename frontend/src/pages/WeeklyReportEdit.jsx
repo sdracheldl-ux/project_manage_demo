@@ -1,27 +1,28 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { Button, message } from 'antd'
 import { ArrowLeftOutlined, SaveOutlined, FieldTimeOutlined } from '@ant-design/icons'
 import RichTextEditor from './enterprise/components/RichTextEditor'
 import {
-  getCurrentWeekInfo, getWeeklyReportById, upsertWeeklyReport, hasUnitWeekly,
+  getCurrentWeekInfo, getWeeklyReportById, getAllWeeklyReports, upsertWeeklyReport,
   getNextIssueNo, buildWeeklyTitle, summarize,
 } from '../utils/weeklyReportStore'
 import { sectionTitleStyle } from '../constants/uiStyles'
 
-/** 演示默认当前登录驻外办（真实系统由登录账号自动归属，无需选择） */
-const CURRENT_UNIT = '驻广办'
+/** 演示默认当前登录驻外办（真实系统由登录账号自动归属，无需选择；驻外办仅三个招商小组） */
+const CURRENT_UNIT = '驻长三角招商小组'
 
 /** 周报编写页（新增/编辑共用，独立页面而非弹窗） */
 export default function WeeklyReportEdit() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const currentWeek = getCurrentWeekInfo()
   const isEdit = !!id
   const record = isEdit ? getWeeklyReportById(id) : null
 
-  // 汇报单位由登录账号自动归属（演示固定驻广办）
-  const unitName = record?.unitName || CURRENT_UNIT
+  // 汇报单位：编辑取原单位；新增优先取列表页「去填写」带入的单位，缺省为演示登录单位
+  const unitName = record?.unitName || location.state?.unit || CURRENT_UNIT
   const [thisWeekWork, setThisWeekWork] = useState(record?.thisWeekWork || '')
   const [nextWeekWork, setNextWeekWork] = useState(record?.nextWeekWork || '')
 
@@ -34,28 +35,34 @@ export default function WeeklyReportEdit() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
-  // 期号：编辑用原期号；新增按单位当年已有最大期号 +1
-  const issueNo = record?.issueNo ?? getNextIssueNo(unitName, currentWeek.year)
+  // 新增时若同单位当周已有周报，本次保存直接覆盖该记录（沿用原 id 与期号）
+  const existingRecord = isEdit
+    ? null
+    : getAllWeeklyReports().find((r) => r.weekKey === currentWeek.weekKey && r.unitName === unitName)
+
+  // 期号：编辑用原期号；覆盖沿用已存期号；全新记录按单位当年最大期号 +1
+  const issueNo = record?.issueNo ?? existingRecord?.issueNo ?? getNextIssueNo(unitName, currentWeek.year)
   const titlePreview = buildWeeklyTitle({ unitName, year: currentWeek.year, issueNo, rangeLabel: currentWeek.rangeLabel })
 
   const handleSave = () => {
-    if (summarize(thisWeekWork) === '' && summarize(nextWeekWork) === '') {
-      message.warning('请至少填写「本周重点工作」或「下周主要工作」内容后再保存')
+    // 「本周重点工作」「下周主要工作」均为必填，为空时逐项拦截
+    if (summarize(thisWeekWork) === '') {
+      message.warning('请填写「本周重点工作」内容后再保存')
       return
     }
-    if (!isEdit && hasUnitWeekly(currentWeek.weekKey, unitName)) {
-      message.warning(`「${unitName}」本周周报已存在，请返回列表直接编辑`)
+    if (summarize(nextWeekWork) === '') {
+      message.warning('请填写「下周主要工作」内容后再保存')
       return
     }
     upsertWeeklyReport({
-      id: record?.id || `wr-${Date.now()}`,
+      id: record?.id || existingRecord?.id || `wr-${Date.now()}`,
       ...currentWeek,
       unitName,
       issueNo,
       thisWeekWork,
       nextWeekWork,
     })
-    message.success('周报已保存，本周内可随时修改')
+    message.success(existingRecord && !isEdit ? '本周已有周报，本次保存已覆盖原内容' : '周报已保存，本周内可随时修改')
     navigate('/overseas/weekly')
   }
 
@@ -94,7 +101,9 @@ export default function WeeklyReportEdit() {
           <span style={{ color: '#8c8c8c', fontSize: 12, marginLeft: 12 }}>（由当前登录账号自动归属）</span>
         </div>
 
-        <div style={{ ...sectionTitleStyle, marginBottom: 8 }}>本周重点工作</div>
+        <div style={{ ...sectionTitleStyle, marginBottom: 8 }}>
+          <span style={{ color: '#ff4d4f', marginRight: 4 }}>*</span>本周重点工作
+        </div>
         <div className="zw-weekly-editor">
           <RichTextEditor
             value={thisWeekWork}
@@ -103,7 +112,9 @@ export default function WeeklyReportEdit() {
           />
         </div>
 
-        <div style={{ ...sectionTitleStyle, marginTop: 24, marginBottom: 8 }}>下周主要工作</div>
+        <div style={{ ...sectionTitleStyle, marginTop: 24, marginBottom: 8 }}>
+          <span style={{ color: '#ff4d4f', marginRight: 4 }}>*</span>下周主要工作
+        </div>
         <div className="zw-weekly-editor">
           <RichTextEditor
             value={nextWeekWork}

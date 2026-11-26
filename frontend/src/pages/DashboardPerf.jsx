@@ -1,51 +1,41 @@
-import { useState, useMemo } from 'react'
-import { Row, Col, Card, Table, Tag, Progress, Button, Space, Select, Tooltip, Dropdown, message } from 'antd'
-import { DownloadOutlined, TrophyOutlined, DownOutlined } from '@ant-design/icons'
-import ReactECharts from 'echarts-for-react'
+/**
+ * 绩效统计（独立二级页，自招商统计页拆分而来）
+ * 内容：考核总览指标卡 + 园区核心指标 + 国企指标 + 部门考核 + 园区活动情况
+ */
+import { useMemo, useState } from 'react'
+import { Button, Card, Dropdown, Progress, Select, Space, Table, Tag, Tooltip, message } from 'antd'
+import { DownloadOutlined, DownOutlined } from '@ant-design/icons'
 import {
   PARKS, SOES, DEPTS,
-  PARK_TARGETS, SOE_TARGETS, DEPT_TARGETS,
+  PARK_TARGETS, SOE_TARGETS,
   GLOBAL_TOTALS, PARK_ACTIVITY_DETAIL, DEPT_LANDING_RESULTS,
-  GLOBAL_EVENTS_SUMMARY, ASSESS_YEARS, ASSESS_MONTHS,
+  ASSESS_YEARS, ASSESS_MONTHS,
 } from '../constants/performanceData'
-import { perfPageBg, perfCardStyle, filterBarStyle, perfSectionTitle, metricCardStyle } from '../constants/performanceStyles'
+import { perfPageBg, perfCardStyle, perfSectionTitle, metricCardStyle } from '../constants/performanceStyles'
 import { COLORS } from '../constants/uiStyles'
 
-/* ==================== 工具函数 ==================== */
+/* ==================== 绩效维度看板 ==================== */
 
-function calcRate(val) {
+function pCalcRate(val) {
   if (!val?.target) return 0
   return Math.round((val.done / val.target) * 100)
 }
 
-function progressColor(rate) {
+function pProgressColor(rate) {
   if (rate >= 80) return '#52c41a'
   if (rate >= 60) return COLORS.primary
   if (rate >= 40) return '#faad14'
   return '#ff4d4f'
 }
 
-function rankTag(rank) {
+function pRankTag(rank) {
   if (rank === 1) return <Tag color="gold" style={{ fontWeight: 600 }}>第{rank}名</Tag>
   if (rank === 2) return <Tag color="#d9d9d9" style={{ fontWeight: 600 }}>第{rank}名</Tag>
   if (rank === 3) return <Tag color="#cd7f32" style={{ fontWeight: 600 }}>第{rank}名</Tag>
   return <span style={{ color: '#8c8c8c', fontSize: 13 }}>第{rank}名</span>
 }
 
-function rateStatusTag(rate) {
-  const map = [
-    { min: 100, label: '已超额', color: '#52c41a' },
-    { min: 80, label: '进展良好', color: COLORS.primary },
-    { min: 60, label: '正常推进', color: '#faad14' },
-    { min: 0, label: '需关注', color: '#ff4d4f' },
-  ]
-  const s = map.find(m => rate >= m.min)
-  return <Tag color={s.color}>{s.label}</Tag>
-}
-
-/* ==================== 全局指标卡片 ==================== */
-
-function MetricBox({ title, value, unit, color }) {
+function PMetricBox({ title, value, unit, color }) {
   return (
     <Card styles={{ body: { padding: '16px 20px' } }} style={{ ...metricCardStyle(color), background: '#fff' }}>
       <div style={{ fontSize: 13, color: '#8c8c8c', marginBottom: 4 }}>{title}</div>
@@ -56,44 +46,7 @@ function MetricBox({ title, value, unit, color }) {
   )
 }
 
-/* ==================== 对象选择器（层级下拉） ==================== */
-
 function TargetSelect({ value, onChange }) {
-  // value 结构：{ type: 'park'|'soe'|'dept'|'all', keys: ['park1', 'park2'] }
-  const items = [
-    {
-      key: 'park',
-      label: (
-        <Space>
-          <span style={{ color: COLORS.primary, fontWeight: 600 }}>园区</span>
-          <span style={{ color: '#bfbfbf', fontSize: 12 }}>8个</span>
-        </Space>
-      ),
-      children: PARKS.map(p => ({ key: `park:${p.key}`, label: p.name })),
-    },
-    {
-      key: 'soe',
-      label: (
-        <Space>
-          <span style={{ color: '#722ed1', fontWeight: 600 }}>国企</span>
-          <span style={{ color: '#bfbfbf', fontSize: 12 }}>4个</span>
-        </Space>
-      ),
-      children: SOES.map(s => ({ key: `soe:${s.key}`, label: s.name })),
-    },
-    {
-      key: 'dept',
-      label: (
-        <Space>
-          <span style={{ color: '#13c2c2', fontWeight: 600 }}>部门</span>
-          <span style={{ color: '#bfbfbf', fontSize: 12 }}>9个</span>
-        </Space>
-      ),
-      children: DEPTS.map(d => ({ key: `dept:${d.key}`, label: d.name })),
-    },
-  ]
-
-  // 显示文本
   const displayText = useMemo(() => {
     if (value.type === 'all') return '全部考核对象'
     const typeName = value.type === 'park' ? '园区' : value.type === 'soe' ? '国企' : '部门'
@@ -109,9 +62,8 @@ function TargetSelect({ value, onChange }) {
   }, [value])
 
   const handleMenuClick = ({ key }) => {
-    if (key.startsWith('type:')) {
-      const t = key.replace('type:', '')
-      onChange({ type: t, keys: [] })
+    if (key === 'all') {
+      onChange({ type: 'all', keys: [] })
       return
     }
     const [type, k] = key.split(':')
@@ -125,7 +77,6 @@ function TargetSelect({ value, onChange }) {
     }
   }
 
-  // 自定义菜单（支持多选 + 分组）
   const menu = {
     items: [
       {
@@ -195,18 +146,15 @@ function TargetSelect({ value, onChange }) {
   )
 }
 
-/* ==================== 园区表格列 ==================== */
-
 function parkColumns() {
   const indicators = [
     { key: 'signAmount', label: '签约金额（亿元）' },
     { key: 'startProject', label: '开工开业（个）' },
-    { key: 'fdi', label: 'FDI（万美元）' },
   ]
   return [
     {
       title: '排名', width: 70, align: 'center', fixed: 'left',
-      render: (_, __, idx) => rankTag(idx + 1),
+      render: (_, __, idx) => pRankTag(idx + 1),
     },
     { title: '园区名称', dataIndex: 'name', key: 'name', width: 110, align: 'center', fixed: 'left', render: t => <strong>{t}</strong> },
     ...indicators.flatMap(ind => [
@@ -216,15 +164,13 @@ function parkColumns() {
           { title: '完成值', dataIndex: [ind.key, 'done'], key: `${ind.key}-done`, width: 85, align: 'center', render: v => v != null ? <strong>{typeof v === 'number' && v > 100 ? v.toFixed(1) : v}</strong> : '-' },
           {
             title: '完成率', dataIndex: ind.key, key: `${ind.key}-rate`, width: 100, align: 'center',
-            render: val => { const r = calcRate(val); return <Progress percent={Math.min(r, 100)} size="small" strokeColor={progressColor(r)} format={() => `${r}%`} /> },
+            render: val => { const r = pCalcRate(val); return <Progress percent={Math.min(r, 100)} size="small" strokeColor={pProgressColor(r)} format={() => `${r}%`} /> },
           },
         ],
       },
     ]),
   ]
 }
-
-/* ==================== 国企表格列 ==================== */
 
 function soeColumns() {
   const indicators = [
@@ -243,15 +189,13 @@ function soeColumns() {
           { title: '完成值', dataIndex: [ind.key, 'done'], key: `${ind.key}-done`, width: 80, align: 'center', render: v => v != null ? <strong>{typeof v === 'number' && v > 100 ? v.toFixed(1) : v}</strong> : '-' },
           {
             title: '完成率', dataIndex: ind.key, key: `${ind.key}-rate`, width: 90, align: 'center',
-            render: val => { const r = calcRate(val); return <Progress percent={Math.min(r, 100)} size="small" strokeColor={progressColor(r)} format={() => `${r}%`} /> },
+            render: val => { const r = pCalcRate(val); return <Progress percent={Math.min(r, 100)} size="small" strokeColor={pProgressColor(r)} format={() => `${r}%`} /> },
           },
         ],
       },
     ]),
   ]
 }
-
-/* ==================== 部门表格列 ==================== */
 
 function deptColumns() {
   return [
@@ -317,8 +261,6 @@ function deptColumns() {
   ]
 }
 
-/* ==================== 园区活动明细表 ==================== */
-
 function ParkActivityTable({ data }) {
   return (
     <Table
@@ -337,14 +279,11 @@ function ParkActivityTable({ data }) {
   )
 }
 
-/* ==================== 主页面组件 ==================== */
-
-export default function DashboardPerf() {
+function PerfSection() {
   const [year, setYear] = useState('2026')
   const [month, setMonth] = useState('all')
   const [targetFilter, setTargetFilter] = useState({ type: 'all', keys: [] })
 
-  // 根据筛选条件过滤数据
   const filteredParks = useMemo(() => {
     if (targetFilter.type !== 'park' || targetFilter.keys.length === 0) return PARK_TARGETS
     return PARK_TARGETS.filter(p => targetFilter.keys.includes(p.key))
@@ -366,7 +305,6 @@ export default function DashboardPerf() {
     return PARK_ACTIVITY_DETAIL.filter(a => parkNames.includes(a.park))
   }, [targetFilter])
 
-  // 按筛选重新计算总指标（粗略模拟）
   const displayTotals = useMemo(() => {
     if (targetFilter.type === 'park' && targetFilter.keys.length > 0) {
       const parks = filteredParks
@@ -403,35 +341,10 @@ export default function DashboardPerf() {
     return GLOBAL_TOTALS
   }, [targetFilter, filteredParks, filteredSoes])
 
-  // ECharts option
-  const pieOption = useMemo(() => ({
-    tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
-    legend: { bottom: 0, icon: 'circle' },
-    color: [COLORS.primary, '#52c41a', '#faad14'],
-    series: [{ type: 'pie', radius: ['42%', '68%'], center: ['50%', '48%'], avoidLabelOverlap: false, itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 }, label: { show: false }, emphasis: { label: { show: true, fontSize: 14, fontWeight: 600 } }, data: [
-      { value: typeof displayTotals.signAmount === 'number' ? displayTotals.signAmount : 0, name: '签约金额' },
-      { value: typeof displayTotals.fundArrival === 'number' ? displayTotals.fundArrival : 0, name: '到位资金' },
-      { value: typeof displayTotals.startCount === 'number' ? displayTotals.startCount : 0, name: '开工项目' },
-    ]}],
-  }), [displayTotals])
-
-  const barOption = useMemo(() => ({
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    grid: { left: 80, right: 32, top: 16, bottom: 32 },
-    xAxis: { type: 'value', max: 120 },
-    yAxis: { type: 'category', data: [...filteredParks.map(p => p.name)].reverse(), axisLabel: { fontSize: 12 } },
-    series: [{
-      type: 'bar', barWidth: 18, data: [...filteredParks.map(r => calcRate(r.signAmount)).reverse()],
-      itemStyle: { borderRadius: [0, 4, 4, 0], color: { type: 'linear', x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: '#69b1ff' }, { offset: 1, color: COLORS.primary }] } },
-      label: { show: true, position: 'right', formatter: '{c}%', fontSize: 12 },
-    }],
-  }), [filteredParks])
-
   const handleExport = () => {
     message.success(`已生成 ${year}年${month === 'all' ? '度' : month + '月'}通报文件`)
   }
 
-  // 判断显示哪些区块
   const showPark = targetFilter.type === 'all' || targetFilter.type === 'park'
   const showSoe = targetFilter.type === 'all' || targetFilter.type === 'soe'
   const showDept = targetFilter.type === 'all' || targetFilter.type === 'dept'
@@ -450,13 +363,10 @@ export default function DashboardPerf() {
         </Space>
       </div>
 
-      {/* ====== 全区总指标（无标题） ====== */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 24 }}>
-        <MetricBox title="亿元项目数" value={displayTotals.billionProjects} unit="个" color={COLORS.primary} />
-        <MetricBox title="签约额" value={displayTotals.signAmount} unit="亿元" color={COLORS.primary} />
-        <MetricBox title="到位资金" value={displayTotals.fundArrival} unit="亿元" color="#52c41a" />
-        <MetricBox title="开工数" value={displayTotals.startCount} unit="个" color="#faad14" />
-        <MetricBox title="FDI" value={typeof displayTotals.fdi === 'number' ? displayTotals.fdi.toLocaleString() : displayTotals.fdi} unit="万美元" color="#722ed1" />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
+        <PMetricBox title="亿元项目数" value={displayTotals.billionProjects} unit="个" color={COLORS.primary} />
+        <PMetricBox title="签约额" value={displayTotals.signAmount} unit="亿元" color={COLORS.primary} />
+        <PMetricBox title="开工数" value={displayTotals.startCount} unit="个" color="#faad14" />
       </div>
 
       {/* ====== 园区核心指标 ====== */}
@@ -498,7 +408,16 @@ export default function DashboardPerf() {
           </Card>
         </>
       )}
+    </div>
+  )
+}
 
+/* ==================== 独立页面入口 ==================== */
+
+export default function DashboardPerf() {
+  return (
+    <div className="page-container" style={{ padding: 0 }}>
+      <PerfSection />
     </div>
   )
 }

@@ -6,6 +6,9 @@ import Zhuwai from './pages/Zhuwai'
 import ZhuwaiDetail from './pages/ZhuwaiDetail'
 import ZhaoshangList from './pages/ZhaoshangList'
 import ZhaoshangDetail from './pages/ZhaoshangDetail'
+import ZhaoshangClueDetail from './pages/ZhaoshangClueDetail'
+import DailyClueList from './pages/DailyClueList'
+import DailyClueDetail from './pages/DailyClueDetail'
 import WeeklyReport from './pages/WeeklyReport'
 import WeeklyReportEdit from './pages/WeeklyReportEdit'
 import Zaitan from './pages/Zaitan'
@@ -23,6 +26,8 @@ import ProgressTracking from './pages/performance/ProgressTracking'
 import ApprovalManagement from './pages/performance/ApprovalManagement'
 import CategoryPerformancePage from './pages/performance/CategoryPerformancePage'
 import DashboardProject from './pages/DashboardProject'
+import DashboardClue from './pages/DashboardClue'
+import DashboardPerf from './pages/DashboardPerf'
 import Account from './pages/system/Account'
 import Role from './pages/system/Role'
 import Log from './pages/system/Log'
@@ -52,6 +57,9 @@ function App() {
         <Route path="project/zhuwai/detail/:id" element={<ZhuwaiDetail />} />
         <Route path="project/zhaoshang" element={<ZhaoshangList />} />
         <Route path="project/zhaoshang/detail/:activityId" element={<ZhaoshangDetail />} />
+        <Route path="project/zhaoshang/clue/:clueId" element={<ZhaoshangClueDetail />} />
+        <Route path="project/daily" element={<DailyClueList />} />
+        <Route path="project/daily/clue/:clueId" element={<DailyClueDetail />} />
         <Route path="project/zaitan" element={<Zaitan />} />
         <Route path="project/zaitan/detail/:id" element={<ZaitanDetail />} />
         <Route path="project/qianyue" element={<Qianyue />} />
@@ -69,7 +77,8 @@ function App() {
         <Route path="performance/dept" element={<CategoryPerformancePage category="dept" />} />
         <Route path="performance" element={<Navigate to="/performance/park" replace />} />
         <Route path="dashboard/project" element={<DashboardProject />} />
-        <Route path="dashboard/perf" element={<Navigate to="/dashboard/project" replace />} />
+        <Route path="dashboard/clue" element={<DashboardClue />} />
+        <Route path="dashboard/perf" element={<DashboardPerf />} />
         <Route path="intelligence/enterprise" element={<EnterpriseSearch />} />
         <Route path="intelligence/enterprise/result" element={<EnterpriseResult />} />
         <Route path="intelligence/enterprise/favorites" element={<EnterpriseFavorites />} />

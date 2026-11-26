@@ -18,7 +18,8 @@ import ZhuanLuodiModal from '../components/ZhuanLuodiModal'
 import ProgressTimeline from '../components/ProgressTimeline'
 import ProgressSummaryModal from '../components/ProgressSummaryModal'
 import TransferQianyueModal from '../components/TransferQianyueModal'
-import { useViewRole, msgStore, tuikuAuditStore, useTuikuAuditStore, useTransferStore } from '../store/viewStore'
+import { useViewRole, msgStore, tuikuAuditStore, useTuikuAuditStore, transferStore, useTransferStore } from '../store/viewStore'
+import { activityStore } from '../utils/activityStore'
 import { findUnitByKey } from '../constants/assignConfig'
 import {
   RESPONSIBLE_UNIT_OPTIONS,
@@ -282,6 +283,7 @@ export default function QianyueDetail() {
         ...prev,
       ])
       message.success('进展已添加')
+      activityStore.addActivity({ stage: 'qianyue', projectId: project.key, projectName: project.projectName, type: 'progress', summary: values.content })
       setProgressModalVisible(false)
       progressForm.resetFields()
     } catch (e) {
@@ -404,6 +406,7 @@ export default function QianyueDetail() {
       applicantDeptName: `${role.deptName}-${role.userName}`,
       applyTime: now,
     })
+    activityStore.addActivity({ stage: 'qianyue', projectId: id, projectName: project.projectName, type: 'tuiku', summary: `提交退库申请${reason ? `：${reason}` : ''}` })
     msgStore.addMessage({
       toDeptKey: 'sponsor',
       category: 'coop',
@@ -444,6 +447,7 @@ export default function QianyueDetail() {
     ])
     message.success('已推进至落地阶段')
     setZhuanLuodiVisible(false)
+    activityStore.addActivity({ stage: 'qianyue', projectId: project.key, projectName: project.projectName, type: 'stageChange', summary: '由「签约」阶段转入「落地」' })
     setTimeout(() => navigate('/project/luodi'), 800)
   }
 
@@ -485,7 +489,7 @@ export default function QianyueDetail() {
             {isSponsor && (
               <>
                 <Button type="primary" icon={<PlusOutlined />} onClick={() => setProgressModalVisible(true)}>进展汇报</Button>
-                <Button className="ai-grad-btn" icon={<RobotOutlined />} onClick={() => setAiVisible(true)}>AI 摘要</Button>
+                <Button className="ai-grad-btn" icon={<RobotOutlined />} onClick={() => setAiVisible(true)}>AI 月度摘要</Button>
                 {!tuikuPending && (
                   <>
                     <Button icon={<EditOutlined />} onClick={() => setEditModalVisible(true)}>编辑</Button>
@@ -808,26 +812,22 @@ export default function QianyueDetail() {
         </div>
       </Modal>
 
-      {/* AI 月度进展摘要弹窗（严格按当前自然月） */}
+      {/* AI 月度摘要弹窗（月报段落模式，按项目+年月存档；含协同反馈与移交记录） */}
       <ProgressSummaryModal
         open={aiVisible}
         onCancel={() => setAiVisible(false)}
+        projectId={`qianyue-${project.key}`}
         projectName={project.projectName}
         stageLabel="签约阶段"
         items={progressList}
-        onSave={(content) => {
-          const now = new Date()
-          const pad2 = (n) => String(n).padStart(2, '0')
-          const ts = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())} ${pad2(now.getHours())}:${pad2(now.getMinutes())}`
-          setProgressList((prev) => [{
-            id: `ai-${Date.now()}`,
-            content,
-            reporter: role.userName || CURRENT_USER,
-            updateTime: ts,
-            type: PROGRESS_TYPE.NORMAL,
-            stage: '签约阶段',
-          }, ...prev])
-        }}
+        feedbacks={assignList.flatMap((a) =>
+          (a.feedbacks || []).map((fb) => ({ unit: a.toDeptName, time: fb.time, content: fb.content })),
+        )}
+        transfer={transferStore.getTransferByProject(project.key)}
+        intro={project.projectDesc}
+        investAmount={project.investAmount}
+        industryCategory={project.industryCategory}
+        capitalNature={project.capitalNature}
       />
     </div>
   )

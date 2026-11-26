@@ -7,10 +7,11 @@ import {
   ArrowLeftOutlined, EditOutlined, CheckCircleOutlined, RobotOutlined,
 } from '@ant-design/icons'
 import mockData from '../mock/data.json'
+import { activityStore } from '../utils/activityStore'
 import LuodiEditModal from '../components/LuodiEditModal'
 import ProgressTimeline from '../components/ProgressTimeline'
 import ProgressSummaryModal from '../components/ProgressSummaryModal'
-import { useViewRole } from '../store/viewStore'
+import { useViewRole, transferStore } from '../store/viewStore'
 import { findUnitByKey } from '../constants/assignConfig'
 import { RESPONSIBLE_UNIT_OPTIONS, normalizeResponsibleUnits, CITY_CODE_SEEDS } from '../constants/projectEnums'
 import {
@@ -246,6 +247,7 @@ export default function LuodiDetail() {
       startWorkDate: values.startDate ? fmt(values.startDate) : prev.startWorkDate,
     }))
     message.success('落地信息已更新')
+    activityStore.addActivity({ stage: 'luodi', projectId: project.key, projectName: project.projectName, type: 'progress', summary: `更新落地信息：开工类型「${values.startWorkType || '-'}」，开工/业时间「${values.startDate ? fmt(values.startDate) : '-'}」` })
     setEditModalVisible(false)
   }
 
@@ -280,7 +282,7 @@ export default function LuodiDetail() {
             )}
           </div>
           <Space size={8}>
-            <Button className="ai-grad-btn" icon={<RobotOutlined />} onClick={() => setAiVisible(true)}>AI 摘要</Button>
+            <Button className="ai-grad-btn" icon={<RobotOutlined />} onClick={() => setAiVisible(true)}>AI 月度摘要</Button>
             {isSponsor && (
               <Button type="primary" icon={<EditOutlined />} onClick={() => setEditModalVisible(true)}>编辑</Button>
             )}
@@ -504,13 +506,23 @@ export default function LuodiDetail() {
         onOk={handleEditOk}
       />
 
-      {/* AI 月度进展摘要弹窗（落地为只读展示，可生成/复制，不支持另存） */}
+      {/* AI 月度摘要弹窗（月报段落模式，按项目+年月存档；含协同反馈） */}
       <ProgressSummaryModal
         open={aiVisible}
         onCancel={() => setAiVisible(false)}
+        projectId={`luodi-${project.key}`}
         projectName={project.projectName}
         stageLabel="落地阶段"
         items={progressList}
+        feedbacks={assignList.flatMap((a) =>
+          (a.feedbacks || []).map((fb) => ({ unit: a.toDeptName, time: fb.time, content: fb.content })),
+        )}
+        transfer={transferStore.getTransferByProject(project.key)}
+        intro={project.projectDesc}
+        investAmount={project.investAmount}
+        industryCategory={project.industryCategory}
+        capitalNature={project.capitalNature}
+        landedMonth={project.startWorkDate && project.startWorkDate !== '-' ? String(project.startWorkDate).slice(0, 7) : null}
       />
     </div>
   )

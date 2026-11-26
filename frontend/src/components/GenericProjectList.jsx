@@ -227,7 +227,7 @@ export default function GenericProjectList({
           )}
           <RangePicker style={{ width: 260 }} value={filters.dateRange}
             onChange={(v) => setFilters({ ...filters, dateRange: v })} />
-          {(topFilters || []).map(f => (
+          {(topFilters || []).filter(f => !f.expanded).map(f => (
             <Select key={f.key} placeholder={f.label} {...selectCommon}
               mode={f.multiple ? 'multiple' : undefined}
               options={f.options}
@@ -240,6 +240,7 @@ export default function GenericProjectList({
           {(() => {
             const hasExpandContent =
               (extraFilters && extraFilters.length > 0) ||
+              (topFilters || []).some(f => f.expanded) ||
               !hiddenFilters.includes('warnStatus') ||
               !hiddenFilters.includes('enterpriseNature')
             return hasExpandContent ? (
@@ -279,20 +280,36 @@ export default function GenericProjectList({
           </div>
         )}
 
-        {filterExpanded && (!hiddenFilters.includes('warnStatus') || !hiddenFilters.includes('enterpriseNature')) && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: extraFilters && extraFilters.length ? 12 : 0, flexWrap: 'wrap' }}>
-            {!hiddenFilters.includes('warnStatus') && (
-              <Select placeholder="预警状态" {...selectCommon} style={{ width: fw }}
-                value={filters.warnStatus} onChange={(v) => setFilters({ ...filters, warnStatus: v })}
-                options={[{ label: '红色预警', value: 'red' }, { label: '黄色预警', value: 'yellow' }, { label: '正常', value: 'normal' }]} />
-            )}
-            {!hiddenFilters.includes('enterpriseNature') && (
-              <Select placeholder="企业性质" {...selectCommon} style={{ width: fw }}
-                value={filters.enterpriseNature} onChange={(v) => setFilters({ ...filters, enterpriseNature: v })}
-                options={[{ label: '国企（央企）', value: 'central_soe' }, { label: '国企（地方）', value: 'local_soe' }, { label: '民企', value: 'private' }, { label: '外企', value: 'foreign' }]} />
-            )}
-          </div>
-        )}
+        {filterExpanded && (() => {
+          // 展开区：topFilters 中标记 expanded 的筛选项 + 预警状态/企业性质（展开区无内容时不渲染该行）
+          const expandedTop = (topFilters || []).filter(f => f.expanded)
+          const hasNatureFilters = !hiddenFilters.includes('warnStatus') || !hiddenFilters.includes('enterpriseNature')
+          if (expandedTop.length === 0 && !hasNatureFilters) return null
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+              {expandedTop.map(f => (
+                <Select key={f.key} placeholder={f.label} {...selectCommon}
+                  mode={f.multiple ? 'multiple' : undefined}
+                  options={f.options}
+                  showSearch
+                  allowClear
+                  maxTagCount="responsive"
+                  style={{ width: f.width || (f.multiple ? 220 : fw) }}
+                  value={filters[f.key]} onChange={(v) => setFilters({ ...filters, [f.key]: v })} />
+              ))}
+              {!hiddenFilters.includes('warnStatus') && (
+                <Select placeholder="预警状态" {...selectCommon} style={{ width: fw }}
+                  value={filters.warnStatus} onChange={(v) => setFilters({ ...filters, warnStatus: v })}
+                  options={[{ label: '红色预警', value: 'red' }, { label: '黄色预警', value: 'yellow' }, { label: '正常', value: 'normal' }]} />
+              )}
+              {!hiddenFilters.includes('enterpriseNature') && (
+                <Select placeholder="企业性质" {...selectCommon} style={{ width: fw }}
+                  value={filters.enterpriseNature} onChange={(v) => setFilters({ ...filters, enterpriseNature: v })}
+                  options={[{ label: '国企（央企）', value: 'central_soe' }, { label: '国企（地方）', value: 'local_soe' }, { label: '民企', value: 'private' }, { label: '外企', value: 'foreign' }]} />
+              )}
+            </div>
+          )
+        })()}
 
         <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
           <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>

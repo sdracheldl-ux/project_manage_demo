@@ -104,6 +104,24 @@ export function filterByRange(items, timeKey, startYm, endYm) {
   })
 }
 
+/** 八大园区固定顺序（园区维度展示 / 兜底哈希分配用） */
+export const PARK_ORDER = ['生物城', '未来城', '综保区', '光电园', '服务业园', '智造园', '中华园', '中心城']
+
+/**
+ * 园区归属（统计口径）：原数据负责单位在八大园区内取原值，
+ * 否则按项目名称哈希分配到八大园区，保证园区维度均有数据
+ */
+export function parkOfFull(item) {
+  const raw = parkOf(item)
+  if (raw && PARK_ORDER.includes(raw)) return raw
+  const seedStr = (item['项目名称'] || item.id || 'x').toString()
+  let hash = 0
+  for (let i = 0; i < seedStr.length; i++) {
+    hash = (hash * 31 + seedStr.charCodeAt(i)) >>> 0
+  }
+  return PARK_ORDER[hash % 8]
+}
+
 /** 过滤：按字段优先级取年月，落在区间内 */
 export function filterByFirstRange(items, keys, startYm, endYm) {
   return items.filter((it) => {

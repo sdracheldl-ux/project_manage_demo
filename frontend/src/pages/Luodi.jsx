@@ -6,6 +6,7 @@ import GenericProjectList from '../components/GenericProjectList'
 import mockData from '../mock/data.json'
 import { actionLinkStyle } from '../constants/uiStyles'
 import { RESPONSIBLE_UNIT_SELECT_GROUPS, RESPONSIBLE_UNIT_OPTIONS, normalizeResponsibleUnits, CITY_CODE_SEEDS } from '../constants/projectEnums'
+import AiSummaryBar, { hl } from '../components/AiSummaryBar'
 
 const emptyTag = (v) => (v && v !== '-' ? v : <span style={{ color: '#bfbfbf' }}>-</span>)
 const tagStartType = (v) => {
@@ -66,6 +67,46 @@ export default function Luodi() {
       _raw: item,
     }))
   }, [])
+
+  // ===== 板块概述（实时统计）：让用户一眼掌握落地库核心信息 =====
+  const summary = useMemo(() => {
+    const total = dataList.length
+    const investSum = dataList.reduce((s, r) => s + (Number(r.investAmount) || 0), 0)
+    // 产业类别计数（工业/服务业；农业等其余类别不计入）
+    const byCat = { 工业: 0, 服务业: 0 }
+    // 行业门类计数（行业类别（门类）字段）
+    const byType = {}
+    // 开工开业类型计数（仅统计有值的行）
+    const byStart = {}
+    dataList.forEach((r) => {
+      if (byCat[r.industryCategory] !== undefined) byCat[r.industryCategory] += 1
+      const gate = String(r.industryType || '').split(' / ')[0]
+      if (gate && gate !== '-') byType[gate] = (byType[gate] || 0) + 1
+      if (r.startType && r.startType !== '-') byStart[r.startType] = (byStart[r.startType] || 0) + 1
+    })
+    const topList = Object.entries(byType).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    return { total, investSum, byCat, topList, byStart }
+  }, [dataList])
+
+  const pctOf = (n) => (summary.total ? Math.round((n / summary.total) * 100) : 0)
+  const catText = ['工业', '服务业'].filter((c) => summary.byCat[c] > 0)
+    .map((c) => <span key={c}>{c}项目{hl(summary.byCat[c])}个</span>)
+    .reduce((acc, item, i) => (i === 0 ? [item] : [...acc, '，', item]), [])
+  // 开工开业类型展示顺序：已开业、已开工-设备购置类、已开工-建安类（数据中不存在的类型自动省略）
+  const startText = [['开业', '已开业'], ['已开工（设备购置类）', '已开工-设备购置类'], ['已开工（建安类）', '已开工-建安类']]
+    .filter(([k]) => summary.byStart[k])
+    .map(([k, label]) => <span key={k}>{label} {hl(summary.byStart[k])}个</span>)
+    .reduce((acc, item, i) => (i === 0 ? [item] : [...acc, '、', item]), [])
+
+  const summaryNode = summary.total === 0 ? null : (
+    <AiSummaryBar>
+      落地项目共{hl(summary.total)}个，投资总额{hl(`${summary.investSum.toFixed(1)} 亿元`)}；其中{catText}。
+      {summary.topList.length > 0 && (
+        <span>按产业分布，占比最高为 {summary.topList[0][0]} {hl(`${summary.topList[0][1]}个（${pctOf(summary.topList[0][1])}%）`)}。</span>
+      )}
+      {startText.length > 0 && <span>其中{startText}。</span>}
+    </AiSummaryBar>
+  )
 
   const handleDetail = (record) => navigate(`/project/luodi/detail/${record.key}`)
 
@@ -138,6 +179,7 @@ export default function Luodi() {
     <>
       <GenericProjectList
         stage="luodi"
+        headerSlot={summaryNode}
         dataList={dataList}
         columns={columns}
         filters={extraFilters}

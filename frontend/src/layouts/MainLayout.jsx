@@ -33,6 +33,7 @@ import {
   GlobalOutlined,
   GiftOutlined,
   AimOutlined,
+  FileSearchOutlined,
 } from '@ant-design/icons'
 import { useViewRole, useMessages } from '../store/viewStore'
 import { VIEW_ROLES } from '../constants/assignConfig'
@@ -45,7 +46,9 @@ const menuItems = [
     icon: <DashboardOutlined />,
     label: '统计看板',
     children: [
-      { key: '/dashboard/project', icon: <PieChartOutlined />, label: '统计看板' },
+      { key: '/dashboard/clue', icon: <AimOutlined />, label: '线索统计' },
+      { key: '/dashboard/project', icon: <PieChartOutlined />, label: '招商统计' },
+      { key: '/dashboard/perf', icon: <TrophyOutlined />, label: '绩效统计' },
     ],
   },
   {
@@ -54,6 +57,7 @@ const menuItems = [
     label: '线索管理',
     children: [
       { key: '/project/zhaoshang', icon: <GiftOutlined />, label: '招商活动线索' },
+      { key: '/project/daily', icon: <FileSearchOutlined />, label: '日常线索' },
       { key: '/project/zhuwai', icon: <GlobalOutlined />, label: '驻外线索' },
       { key: '/overseas/weekly', icon: <FileTextOutlined />, label: '驻外周报' },
     ],
@@ -113,6 +117,8 @@ const breadcrumbMap = {
   '/project/zhuwai/detail': ['线索管理', '驻外线索', '项目详情'],
   '/project/zhaoshang': ['线索管理', '招商活动线索'],
   '/project/zhaoshang/detail': ['线索管理', '招商活动线索', '活动详情'],
+  '/project/daily': ['线索管理', '日常线索'],
+  '/project/daily/clue': ['线索管理', '日常线索', '线索详情'],
   '/project/mouhua': ['项目全生命周期管理', '项目谋划'],
   '/project/mouhua/detail': ['项目全生命周期管理', '项目谋划', '项目详情'],
   '/project/zaitan': ['项目全生命周期管理', '跟踪洽谈'],
@@ -126,8 +132,9 @@ const breadcrumbMap = {
   '/performance/park': ['绩效考核', '园区考核'],
   '/performance/soe': ['绩效考核', '国企考核'],
   '/performance/dept': ['绩效考核', '部门考核'],
-  '/dashboard/project': ['统计看板'],
-  '/dashboard/perf': ['统计看板'],
+  '/dashboard/project': ['统计看板', '招商统计'],
+  '/dashboard/clue': ['统计看板', '线索统计'],
+  '/dashboard/perf': ['统计看板', '绩效统计'],
   '/intelligence/enterprise': ['产业情报', '企业线索洞察'],
   '/intelligence/enterprise/favorites': ['产业情报', '关注企业'],
   '/intelligence/enterprise/rankings': ['产业情报', '热点榜单'],
@@ -143,6 +150,22 @@ const breadcrumbMap = {
   '/system/profile': ['系统管理', '个人中心'],
 }
 
+// 园区账号判断（与 DashboardProject 的 ROLE_PARK_MAP 一致）：deptName 命中即视为园区账号
+const ROLE_PARK_MAP = {
+  光谷生物城: '生物城',
+  生物城: '生物城',
+  未来科技城: '未来城',
+  未来城: '未来城',
+  光谷中心城: '中心城',
+  中心城: '中心城',
+  东湖综合保税区: '综保区',
+  综保区: '综保区',
+  光电园: '光电园',
+  服务业园: '服务业园',
+  智造园: '智造园',
+  中华园: '中华园',
+}
+
 export default function MainLayout() {
   const [collapsed, setCollapsed] = useState(false)
   const [openKeys, setOpenKeys] = useState(['project'])
@@ -150,6 +173,15 @@ export default function MainLayout() {
   const location = useLocation()
   const { role, setRole } = useViewRole()
   const { unread } = useMessages()
+
+  // 园区账号不展示「线索统计」菜单（线索统计无园区维度，仅投促局/驻外办/全区口径）
+  const isPark = !!ROLE_PARK_MAP[role?.deptName]
+  const visibleMenuItems = useMemo(() => {
+    if (!isPark) return menuItems
+    return menuItems.map((m) => (
+      m.key === 'dashboard' ? { ...m, children: m.children.filter((c) => c.key !== '/dashboard/clue') } : m
+    ))
+  }, [isPark])
 
   const realPath = useMemo(() => {
     const h = location.hash || ''
@@ -176,14 +208,15 @@ export default function MainLayout() {
   }
 
   const currentOpenKeys = useMemo(() => {
-    const match = findMenuMatch(menuItems)
+    const match = findMenuMatch(visibleMenuItems)
     if (match) return Array.from(new Set([...openKeys, ...match.parents]))
     return openKeys
-  }, [realPath, openKeys])
+  }, [realPath, openKeys, visibleMenuItems])
 
   const getBreadcrumbKey = (path) => {
     if (path.startsWith('/project/zhuwai/detail')) return '/project/zhuwai/detail'
     if (path.startsWith('/project/zhaoshang/detail')) return '/project/zhaoshang/detail'
+    if (path.startsWith('/project/daily/clue')) return '/project/daily/clue'
     if (path.startsWith('/project/mouhua/detail')) return '/project/mouhua/detail'
     if (path.startsWith('/project/zaitan/detail')) return '/project/zaitan/detail'
     if (path.startsWith('/overseas/weekly/edit')) return '/overseas/weekly/edit'
@@ -207,6 +240,7 @@ export default function MainLayout() {
   const getMenuKey = (path) => {
     if (path.startsWith('/project/zhuwai')) return '/project/zhuwai'
     if (path.startsWith('/project/zhaoshang')) return '/project/zhaoshang'
+    if (path.startsWith('/project/daily')) return '/project/daily'
     if (path.startsWith('/project/mouhua')) return '/project/mouhua'
     if (path.startsWith('/project/zaitan')) return '/project/zaitan'
     if (path.startsWith('/project/qianyue')) return '/project/qianyue'
@@ -218,6 +252,7 @@ export default function MainLayout() {
       return matched ? matched.key : path
     }
     if (path.startsWith('/dashboard/project')) return '/dashboard/project'
+    if (path.startsWith('/dashboard/clue')) return '/dashboard/clue'
     if (path.startsWith('/dashboard/perf')) return '/dashboard/perf'
     if (path.startsWith('/intelligence/enterprise/favorites')) return '/intelligence/enterprise/favorites'
     if (path.startsWith('/intelligence/enterprise/rankings')) return '/intelligence/enterprise/rankings'
@@ -286,7 +321,7 @@ export default function MainLayout() {
           selectedKeys={[getMenuKey(realPath)]}
           openKeys={currentOpenKeys}
           onOpenChange={(keys) => setOpenKeys(keys)}
-          items={menuItems}
+          items={visibleMenuItems}
           onClick={({ key }) => { if (key.startsWith('/')) navigate(key) }}
           style={{ borderRight: 0, paddingTop: 8 }}
         />

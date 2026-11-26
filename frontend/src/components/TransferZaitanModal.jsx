@@ -2,6 +2,7 @@ import { Modal, Form, Select, Input, message } from 'antd'
 import { Modal as AntModal } from 'antd'
 import { ALL_UNITS } from '../constants/assignConfig'
 import { transferStore, msgStore, useViewRole } from '../store/viewStore'
+import { activityStore } from '../utils/activityStore'
 
 const { TextArea } = Input
 
@@ -39,6 +40,8 @@ export default function TransferZaitanModal({ open, projectData, onCancel, onOk 
             by: `${role.deptName} ${role.userName}`,
             time: new Date().toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-'),
           })
+          // 本周动态：项目移交事件
+          activityStore.addActivity({ stage: 'zaitan', projectId: projectData?.key ?? projectData?.id, projectName: projectData?.projectName, type: 'transfer', summary: `移交至「${park?.name}」跟进` })
           // 2. 园区消息提醒
           msgStore.addMessage({
             toDeptKey: values.toDeptKey,

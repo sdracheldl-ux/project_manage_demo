@@ -3,10 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import { Tag, Tooltip, Space, Divider, Modal, Form, Input, InputNumber, Select, Cascader, Row, Col, message, Dropdown, Alert, Button } from 'antd'
 import { EyeOutlined, FileTextOutlined, EditOutlined, MoreOutlined, PauseCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
 import GenericProjectList from '../components/GenericProjectList'
+import AiSummaryBar, { hl } from '../components/AiSummaryBar'
 import TransferToZaitanModal from '../components/TransferToZaitanModal'
 import DuplicateWarningModal from '../components/DuplicateWarningModal'
+import ImportModal from '../components/ImportModal'
 import mockData from '../mock/data.json'
-import { checkDuplicates, buildZaitanLib } from '../utils/duplicateCheck'
+import { checkDuplicates, buildMouhuaZaitanLib } from '../utils/duplicateCheck'
+import { useImported } from '../store/viewStore'
 import { RESPONSIBLE_UNIT_SELECT_GROUPS, RESPONSIBLE_UNIT_OPTIONS, normalizeResponsibleUnits, generateDistrictCode, DISTRICT_CODE_SEEDS } from '../constants/projectEnums'
 
 const { TextArea } = Input
@@ -499,6 +502,9 @@ export default function Mouhua() {
   const [tuikuVisible, setTuikuVisible] = useState(false)
   const [tuikuRecord, setTuikuRecord] = useState(null)
   const [tuikuReason, setTuikuReason] = useState('')
+  // ===== 批量导入（谋划）=====
+  const [importVisible, setImportVisible] = useState(false)
+  const imported = useImported()
   // ===== 实时判重（PRD 2.1.8 场景一）=====
   const [warnVisible, setWarnVisible] = useState(false)
   const [warnHits, setWarnHits] = useState([])
@@ -541,8 +547,69 @@ export default function Mouhua() {
       projectCategory: ['政策类', '投资类', '供地类', '其他'][idx % 4],
       _formValues: mockFormValues[idx],
     }))
-    return [...base, ...extraDataList].filter(item => !transferredKeys.includes(item.key))
-  }, [extraDataList, transferredKeys])
+    // 批量导入成功行（无冲突）：中文键导入行适配为谋划列表行结构，置顶入库（冲突行已由 ImportModal 转入研判池）
+    const importedRows = imported?.stage === 'mouhua'
+      ? imported.successProjects.map((p, i) => ({
+        key: p.id,
+        index: base.length + i + 1 + extraDataList.length,
+        districtProjectCode: generateDistrictCode(),
+        reporter: p['申报人'] || '-',
+        projectStatus: '谋划中',
+        projectName: p['项目名称'] || '-',
+        sourceArea: p['来源地'] || '-',
+        industryCategory: p['产业类别'] || '-',
+        industryType: p['行业类别'] || '-',
+        projectDesc: p['项目简介'] || '-',
+        investorEntity: p['投资主体'] || '-',
+        investAmount: p['投资金额（亿元）'] ?? p['投资金额(亿元)'] ?? '-',
+        responsibleUnits: ['-'],
+        enterpriseNature: p['企业性质'] || '-',
+        mouhuaType: '-',
+        mouhuaSource: '批量导入',
+        reportTime: p['申报时间'] || '-',
+        auditStatus: '待审核',
+        projectCategory: '-',
+      }))
+      : []
+    return [...base, ...importedRows, ...extraDataList].filter(item => !transferredKeys.includes(item.key))
+  }, [extraDataList, transferredKeys, imported])
+
+  // ===== 板块概述（实时统计）：让用户一眼掌握谋划库核心信息 =====
+  const summary = useMemo(() => {
+    const total = dataList.length
+    const investSum = dataList.reduce((s, r) => s + (Number(r.investAmount) || 0), 0)
+    // 产业类别计数（工业/服务业/农业）
+    const byCat = { 工业: 0, 服务业: 0, 农业: 0 }
+    // 行业门类计数（industryType 为「门类 / 大类」拼接，取门类部分）
+    const byType = {}
+    dataList.forEach((r) => {
+      if (byCat[r.industryCategory] !== undefined) byCat[r.industryCategory] += 1
+      const gate = String(r.industryType || '').split(' / ')[0]
+      if (gate && gate !== '-') byType[gate] = (byType[gate] || 0) + 1
+    })
+    const topList = Object.entries(byType).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    return { total, investSum, byCat, topList }
+  }, [dataList])
+
+  const pctOf = (n) => (summary.total ? Math.round((n / summary.total) * 100) : 0)
+  const catText = ['工业', '服务业', '农业']
+    .filter((c) => summary.byCat[c] !== undefined)
+    .map((c) => <span key={c}>{c}项目{hl(summary.byCat[c])}个</span>)
+    .reduce((acc, item, i) => (i === 0 ? [item] : [...acc, '，', item]), [])
+  const topRest = summary.topList.slice(1).map(([name, n]) => <span key={name}>{name} {hl(`${n}个（${pctOf(n)}%）`)}</span>)
+    .reduce((acc, item, i) => (i === 0 ? [item] : [...acc, '、', item]), [])
+
+  const summaryNode = (
+    <AiSummaryBar>
+      谋划库现有项目{hl(summary.total)}个，计划投资总额{hl(`${summary.investSum.toFixed(1)} 亿元`)}；其中{catText}。
+      {summary.topList.length > 0 && (
+        <span>
+          按产业分布，占比最高为 {summary.topList[0][0]} {hl(`${summary.topList[0][1]}个（${pctOf(summary.topList[0][1])}%）`)}
+          {topRest.length > 0 && <span>，其次是{topRest}</span>}。
+        </span>
+      )}
+    </AiSummaryBar>
+  )
 
   const columns = useMemo(() => [
     { key: 'index', title: '序号', dataIndex: 'index', width: 55, align: 'center', fixed: 'left', required: true },
@@ -703,10 +770,7 @@ export default function Mouhua() {
         industryType: values.industryCategory ? values.industryCategory.join(' / ') : '',
         reporter: '投促局管理员',
         reportTime: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
-      }, [
-        { stage: '谋划', rows: dataList },
-        { stage: '在谈', rows: buildZaitanLib() },
-      ])
+      }, buildMouhuaZaitanLib(dataList))
       const strongHits = hits.filter(h => h.level !== 'L4')
       const l4Only = hits.filter(h => h.level === 'L4')
       if (strongHits.length > 0) {
@@ -754,6 +818,7 @@ export default function Mouhua() {
       <GenericProjectList
         stage="mouhua"
         title="项目谋划"
+        headerSlot={summaryNode}
         addButtonText="新增谋划项目"
         nextStageText="在谈"
         dataList={dataList}
@@ -761,8 +826,9 @@ export default function Mouhua() {
         filters={extraFilters}
         scrollX={1630}
         canAdd={true}
-        canImport={false}
+        canImport={true}
         onAdd={handleAdd}
+        onImport={() => setImportVisible(true)}
         hiddenFilters={['acceptStatus', 'auditStatus', 'warnStatus', 'enterpriseNature']}
       />
       <Modal
@@ -890,6 +956,14 @@ export default function Mouhua() {
         onCancel={() => setTransferModalVisible(false)}
         onOk={handleTransferOk}
         projectData={currentTransferProject}
+      />
+
+      {/* 批量导入（谋划）：三步演示导入，冲突行转入研判池（Yanpan 消费），无冲突行置顶入库 */}
+      <ImportModal
+        open={importVisible}
+        stage="mouhua"
+        stageLabel="谋划"
+        onCancel={() => setImportVisible(false)}
       />
 
       {/* 实时判重预警弹窗（L1 阻断 / L2·L3 二选一） */}

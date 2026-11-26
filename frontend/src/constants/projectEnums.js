@@ -313,15 +313,39 @@ export const generateClueCode = () => {
 export const CLUE_CODE_SEEDS = ['XW20261012001', 'XW20260908002', 'XW20261103003', 'XW20261028004']
 
 // ===== 招商活动线索编码（招商活动下线索专用） =====
-// 格式：ZS + YYYYMMDD + 3位序号（如 ZS20261105001）；区别于驻外线索 XW 前缀
+// 格式：HD + YYYYMMDD + 3位序号（如 HD20261105001）；HD 标识活动线索，区别于驻外线索 XW 前缀
 export const generateZsClueCode = () => {
   const now = new Date()
   const pad = (n, len = 2) => String(n).padStart(len, '0')
   const dateStr = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`
   const seq = String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')
-  return `ZS${dateStr}${seq}`
+  return `HD${dateStr}${seq}`
 }
-export const ZS_CLUE_CODE_SEEDS = ['ZS20261012001', 'ZS20260908002', 'ZS20261103003', 'ZS20261028004']
+export const ZS_CLUE_CODE_SEEDS = ['HD20261012001', 'HD20260908002', 'HD20261103003', 'HD20261028004']
+
+// ===== 日常线索编码（日常线索专用） =====
+// 格式：RC + YYYYMMDD + 3位序号（如 RC20261119001）；RC 标识日常线索，区别于驻外线索 XW、活动线索 HD 前缀
+export const generateRcClueCode = () => {
+  const now = new Date()
+  const pad = (n, len = 2) => String(n).padStart(len, '0')
+  const dateStr = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`
+  const seq = String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')
+  return `RC${dateStr}${seq}`
+}
+
+// 存量演示数据的日常线索编码种子
+export const RC_CLUE_CODE_SEEDS = ['RC20261105001', 'RC20261028002', 'RC20261112003', 'RC20261108004', 'RC20261020005']
+
+// ===== 招商活动申报单位（创建活动人所属单位自动带出，不可手改；投促局各招商小组 + 各园区），便于管理员筛选 =====
+export const ZS_REPORT_UNIT_GROUPS = [
+  { label: '投促局招商小组', options: ['半导体组', '化合物半导体组', '人工智能组', '智能终端组', '生命健康组'] },
+  { label: '园区', options: ['未来科技城', '光谷生物城', '光谷中心城', '东湖综合保税区', '光电园', '服务业园', '智造园', '中华园'] },
+]
+// Select 分组选项
+export const ZS_REPORT_UNIT_SELECT_GROUPS = ZS_REPORT_UNIT_GROUPS.map(g => ({
+  label: g.label,
+  options: g.options.map(u => ({ label: u, value: u })),
+}))
 
 // 存量演示数据的市级项目编码种子（mock 原始数据无此字段）
 export const CITY_CODE_SEEDS = ['SJ20260301001', 'SJ20260302015', 'SJ20260305023', 'SJ20260311008']

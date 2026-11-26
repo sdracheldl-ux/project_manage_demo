@@ -68,7 +68,7 @@ export function buildImportResult({ stage, stageLabel, importUser, importSource 
       confidence: 0.97,
       status: 'pending',
       newStage: stageLabel,
-      existingStage: stageLabel,
+      existingStage: '在谈', // 演示冲突种子固定引用在谈库项目（existingProjectId 指向 mockData.zaitan），跨阶段研判
       importUser,
       importTime: NOW_TIME,
       cityProjectCode: 'SJ-2026-0102',
@@ -118,7 +118,7 @@ export function buildImportResult({ stage, stageLabel, importUser, importSource 
       confidence: 0.66,
       status: 'pending',
       newStage: stageLabel,
-      existingStage: stageLabel,
+      existingStage: '在谈', // 演示冲突种子固定引用在谈库项目（existingProjectId 指向 mockData.zaitan），跨阶段研判
       importUser,
       importTime: NOW_TIME,
       investorEntity: '武汉光芯电子技术有限公司',

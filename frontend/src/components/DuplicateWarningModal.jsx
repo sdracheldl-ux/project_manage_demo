@@ -3,6 +3,7 @@ import { Modal, Tag, Button, Popconfirm, Typography } from 'antd'
 import {
   WarningFilled,
   RightOutlined,
+  InfoCircleOutlined,
 } from '@ant-design/icons'
 
 const { Text } = Typography
@@ -22,6 +23,9 @@ const LEVEL_META = {
 }
 
 const STAGE_PATH = { 在谈: 'zaitan', 谋划: 'mouhua', 签约: 'qianyue', 落地: 'luodi' }
+
+// 命中项目所在阶段 Tag 配色（谋划/在谈区分展示）
+const STAGE_TAG_COLOR = { 谋划: 'blue', 在谈: 'cyan', 签约: 'purple', 落地: 'geekblue' }
 
 const STATUS_META = {
   same: { text: '一致', color: '#52c41a', bg: '#f6ffed' },
@@ -45,7 +49,7 @@ function HitCard({ hit, onViewDetail }) {
       <div style={{ background: '#fafafa', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
         <div style={{ marginBottom: 6 }}>
           <span style={{ fontWeight: 600, fontSize: 14 }}>{t.projectName}</span>
-          <Tag style={{ marginLeft: 8 }} bordered={false}>{t.stageLabel || t.stage}</Tag>
+          <Tag style={{ marginLeft: 8 }} bordered={false} color={STAGE_TAG_COLOR[t.stage]}>{t.stageLabel || t.stage}</Tag>
         </div>
         <div style={{ fontSize: 12, color: '#595959', display: 'flex', flexWrap: 'wrap', gap: '2px 20px' }}>
           <span>投资主体：{t.investorEntity || '—'}</span>
@@ -101,7 +105,7 @@ function HitCard({ hit, onViewDetail }) {
   )
 }
 
-export default function DuplicateWarningModal({ open, hits = [], contextTitle = '', onReturn, onForce, onCloseAll }) {
+export default function DuplicateWarningModal({ open, hits = [], contextTitle = '', upgradeHint = '', onReturn, onForce, onCloseAll }) {
   const navigate = useNavigate()
   if (!hits.length) return null
   const blocked = hits.every(h => h.level === 'L1')
@@ -152,6 +156,11 @@ export default function DuplicateWarningModal({ open, hits = [], contextTitle = 
           ? <>命中强匹配，<Text strong type="danger">已阻断保存</Text>，请修改后重新提交。</>
           : <>请核实是否为同一项目，可选择返回修改或仍要提交。</>}
       </div>
+      {upgradeHint && (
+        <div style={{ background: '#e6f4ff', border: '1px solid #91caff', borderRadius: 6, padding: '8px 14px', marginBottom: 12, fontSize: 13, color: '#0958d9' }}>
+          <InfoCircleOutlined style={{ marginRight: 8 }} />{upgradeHint}
+        </div>
+      )}
       <div style={{ maxHeight: 'calc(80vh - 220px)', overflowY: 'auto' }}>
         {hits.map((hit, i) => (
           <HitCard key={i} hit={hit} onViewDetail={handleViewDetail} />

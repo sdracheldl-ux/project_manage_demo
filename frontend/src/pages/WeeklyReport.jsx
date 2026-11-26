@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Table, Tag, Drawer, Empty, Select, Button, Tabs } from 'antd'
-import { PlusOutlined, EyeOutlined, EditOutlined, LeftOutlined, RightOutlined } from '@ant-design/icons'
+import { EyeOutlined, EditOutlined, LeftOutlined, RightOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import {
   getCurrentWeekInfo, getWeekInfo, getAllWeeklyReports, buildWeeklyTitle,
@@ -41,7 +41,7 @@ export default function WeeklyReport() {
   const weekIdx = weekOptions.findIndex((w) => w.value === weekKey)
 
   const columns = [
-    { title: '序号', width: 55, align: 'center', fixed: 'left', render: (_, __, idx) => idx + 1 },
+    { title: '序号', width: 55, align: 'center', render: (_, __, idx) => idx + 1 },
     {
       title: '期号', key: 'issue', width: 140, align: 'center',
       render: (_, r) => <span>{r.year}年第{r.issueNo}期</span>,
@@ -60,7 +60,7 @@ export default function WeeklyReport() {
       render: (v) => dayjs(v).format('YYYY-MM-DD HH:mm'),
     },
     {
-      title: '操作', width: 140, fixed: 'right', align: 'center', className: 'action-col-cell',
+      title: '操作', width: 140, align: 'center', className: 'action-col-cell',
       render: (_, r) => (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
           <span style={actionLinkStyle} onClick={() => setViewRecord(r)}>
@@ -116,7 +116,9 @@ export default function WeeklyReport() {
                 </div>
               </>
             ) : (
-              <div className="zw-unit-card-summary empty">本周周报尚未提交</div>
+              <div className="zw-unit-card-summary empty">
+                {isCurrentWeek ? '本周周报尚未提交' : '该周周报未提交'}
+              </div>
             )}
           </div>
         )
@@ -131,17 +133,18 @@ export default function WeeklyReport() {
         columns={columns}
         dataSource={weekRecords}
         pagination={false}
-        scroll={{ x: 1020 }}
+        // scroll.x='100%'：强制内层表格铺满容器（列少无需横向滚动，剩余宽度由两个摘要列吸收）
+        scroll={{ x: '100%' }}
         tableLayout="fixed"
         size="middle"
-        locale={{ emptyText: <Empty description={isCurrentWeek ? '本周暂无周报，点击上方「新增周报」开始填报' : '该周暂无周报'} /> }}
+        locale={{ emptyText: <Empty description={isCurrentWeek ? '本周暂无周报，点击右上角「填写周报」开始填报' : '该周暂无周报'} /> }}
       />
   )
 
   return (
     <div className="page-container">
       {/* ===== 周切换 + 汇报统计条 ===== */}
-      <div className="table-card" style={{ padding: '14px 24px', marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+      <div className="table-card" style={{ padding: '14px 16px', marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         {/* 左：统计 */}
         <div style={{ fontSize: 14, color: '#595959', display: 'flex', alignItems: 'center', gap: 16 }}>
           <span>应报 <b style={{ color: '#262626' }}>{WEEKLY_UNITS.length}</b> 份</span>
@@ -172,30 +175,32 @@ export default function WeeklyReport() {
       </div>
 
       {/* ===== 双 Tab：汇报统计 / 周报列表 ===== */}
-      <div className="table-card" style={{ padding: '8px 24px 16px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <Tabs
-            style={{ flex: 1, minWidth: 0 }}
-            defaultActiveKey="cards"
-            items={[
-              {
-                key: 'cards',
-                label: <span style={{ fontSize: 15 }}>汇报统计{isCurrentWeek && unsubmitted > 0 && <span className="zw-tab-badge">{unsubmitted}</span>}</span>,
-                children: cardsTab,
-              },
-              {
-                key: 'list',
-                label: <span style={{ fontSize: 15 }}>周报列表</span>,
-                children: listTab,
-              },
-            ]}
-          />
-          {isCurrentWeek && (
-            <Button type="primary" icon={<PlusOutlined />} style={{ marginTop: 4 }} onClick={() => navigate('/overseas/weekly/edit')}>
-              新增周报
-            </Button>
-          )}
-        </div>
+      {/* 「填写周报」绝对定位右上角，不占 Tabs 行内空间，保证表格与谋划列表同宽铺满 */}
+      <div className="table-card" style={{ position: 'relative', padding: '8px 16px 16px' }}>
+        <Button
+          type="primary"
+          icon={<EditOutlined />}
+          style={{ position: 'absolute', top: 14, right: 16, zIndex: 1 }}
+          onClick={() => navigate('/overseas/weekly/edit')}
+        >
+          填写周报
+        </Button>
+        <Tabs
+          style={{ width: '100%' }}
+          defaultActiveKey="cards"
+          items={[
+            {
+              key: 'cards',
+              label: <span style={{ fontSize: 15 }}>汇报统计{isCurrentWeek && unsubmitted > 0 && <span className="zw-tab-badge">{unsubmitted}</span>}</span>,
+              children: cardsTab,
+            },
+            {
+              key: 'list',
+              label: <span style={{ fontSize: 15 }}>周报列表</span>,
+              children: listTab,
+            },
+          ]}
+        />
       </div>
 
       {/* 周报查看抽屉（只读） */}
